@@ -55,6 +55,13 @@ export interface IStorage {
   updateProcedureType(id: number, procedureType: Partial<InsertProcedureType>): Promise<ProcedureType>;
   deleteProcedureType(id: number): Promise<void>;
   
+  // Transaction type operations
+  getTransactionTypes(): Promise<TransactionType[]>;
+  getTransactionType(id: number): Promise<TransactionType | undefined>;
+  createTransactionType(transactionType: InsertTransactionType): Promise<TransactionType>;
+  updateTransactionType(id: number, transactionType: Partial<InsertTransactionType>): Promise<TransactionType>;
+  deleteTransactionType(id: number): Promise<void>;
+  
   // Appointment operations
   getAppointments(filters?: { date?: string; doctorId?: string; patientId?: number }): Promise<Appointment[]>;
   getAppointment(id: number): Promise<Appointment | undefined>;

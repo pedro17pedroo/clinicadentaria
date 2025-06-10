@@ -102,14 +102,24 @@ export const procedures = pgTable("procedures", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Transaction types configuration
+export const transactionTypes = pgTable("transaction_types", {
+  id: serial("id").primaryKey(),
+  name: varchar("name").notNull(),
+  category: varchar("category").notNull(), // income, expense
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Financial transactions table
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
-  patientId: integer("patient_id").notNull().references(() => patients.id),
+  patientId: integer("patient_id").references(() => patients.id),
   appointmentId: integer("appointment_id").references(() => appointments.id),
   procedureId: integer("procedure_id").references(() => procedures.id),
+  transactionTypeId: integer("transaction_type_id").notNull().references(() => transactionTypes.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  type: varchar("type").notNull(), // consultation, procedure
   status: varchar("status").notNull().default("pending"), // pending, paid, overdue
   description: text("description"),
   transactionDate: timestamp("transaction_date").defaultNow(),
@@ -141,6 +151,9 @@ export type ConsultationType = typeof consultationTypes.$inferSelect;
 export type InsertProcedureType = typeof procedureTypes.$inferInsert;
 export type ProcedureType = typeof procedureTypes.$inferSelect;
 
+export type InsertTransactionType = typeof transactionTypes.$inferInsert;
+export type TransactionType = typeof transactionTypes.$inferSelect;
+
 export type InsertAppointment = typeof appointments.$inferInsert;
 export type Appointment = typeof appointments.$inferSelect;
 
@@ -166,6 +179,11 @@ export const insertConsultationTypeSchema = createInsertSchema(consultationTypes
 });
 
 export const insertProcedureTypeSchema = createInsertSchema(procedureTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTransactionTypeSchema = createInsertSchema(transactionTypes).omit({
   id: true,
   createdAt: true,
 });
