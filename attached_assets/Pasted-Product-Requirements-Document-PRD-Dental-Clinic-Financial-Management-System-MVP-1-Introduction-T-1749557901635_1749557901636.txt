@@ -1,0 +1,159 @@
+Product Requirements Document (PRD): Dental Clinic Financial Management System MVP
+1. Introduction
+This PRD defines the requirements for a Minimum Viable Product (MVP) of a web-based financial and operational management system for dental clinics. The system aims to streamline appointment scheduling, procedure management, patient records, financial tracking, and reporting, with robust user access control.
+1.1 Purpose
+To deliver a platform that enables dental clinics to:
+
+Schedule and manage appointments with logical availability checks.
+Record procedures linked to consultations and maintain patient clinical histories.
+Track financial transactions (revenues from consultations/procedures).
+Generate interactive financial reports.
+Manage users with role-based permissions and secure access.
+
+1.2 Scope
+The MVP focuses on core features for single-clinic operations, including user management, appointment scheduling, procedure logging, patient history, financial transactions, and basic reporting. Future iterations may include payment integrations, multi-clinic support, and automated notifications.
+2. Target Audience
+
+Administrators: Clinic owners/managers who configure system settings, manage users, and oversee operations.
+Employees (Staff): Receptionists or assistants who schedule appointments, record procedures, and manage transactions.
+Dentists (Doctors): Professionals performing consultations/procedures, with access to schedules and patient histories.
+
+3. Functional Requirements
+3.1 User Management
+User Registration:
+Admins create accounts for users (Admins, Employees, Doctors).
+Fields: Name, Email, Password, User Type, Contact Info.
+User types configurable by Admins (e.g., Admin, Receptionist, Dentist).
+Role-Based Permissions:
+Admins: Full access (user management, configurations, reports).
+Employees: Schedule appointments, record procedures, manage transactions, view patient histories.
+Doctors: View schedules, update patient clinical records.
+User Types Configuration:
+Admins define user types and assign permissions (e.g., Receptionist: scheduling + transactions; Dentist: clinical records only).
+
+3.2 Authentication
+Login:
+Email and password authentication.
+Password requirements: min 8 characters, alphanumeric.
+Password Management:
+New users prompted to change password on first login.
+Password recovery via email with a secure reset link.
+Logout: Option to end session.
+
+3.3 Appointment Scheduling
+Appointment Creation:
+Select or register a patient (Fields: Name, CPF/ID, Phone, Email, Address).
+Choose consultation type from Admin-configured list (e.g., Cleaning, Orthodontics, with prices).
+Select doctor (filtered by consultation type and availability).
+Specify date/time, validated against doctor’s schedule to avoid conflicts.
+Logical Flow:
+Consultation type selection filters doctors qualified for the procedure.
+Date/time picker shows available slots based on doctor’s existing appointments/procedures.
+Appointment Status:
+Statuses: Scheduled, Cancelled, Completed.
+Completed appointments generate a pending revenue transaction.
+
+Doctor Management:
+Admins register doctors with specialties and link to consultation types.
+System tracks doctor schedules for availability.
+
+3.4 Procedure Management
+Procedure Setup:
+Admins define procedures (e.g., Filling, Extraction) with prices and types.
+
+Procedure Recording:
+Enabled after marking a consultation as Completed.
+Fields: Patient, Procedure Type(s), Doctor(s), Date, Cost (auto-populated), Notes.
+Support multiple procedures per consultation, with individual doctor selection.
+Costs displayed for each procedure during selection.
+
+Link to Consultation:
+Procedures tied to the originating consultation for tracking.
+
+3.5 Patient Management
+Patient Profile:
+Fields: Name, CPF/ID, Contact Info, Address.
+Searchable by name or CPF/ID.
+Clinical History:
+Record of consultations and procedures (Date, Type, Doctor, Notes).
+Viewable in patient profile, with filters for consultations/procedures.
+Additional Notes:
+Free-text field for medical considerations.
+
+3.6 Financial Management
+Transaction Recording:
+Consultations/procedures generate revenue transactions (pending upon completion).
+Fields: Date, Amount, Type (Consultation/Procedure), Status (Pending, Paid, Overdue).
+Employees/Admins update status (e.g., mark as Paid upon payment).
+
+Transaction Status:
+Pending: Awaiting payment.
+Paid: Payment confirmed.
+Overdue: Unpaid past due date (manual flagging by staff).
+
+Financial Reports:
+Generate reports by period (daily, weekly, monthly), transaction type, consultation type, or procedure type.
+Visualizations:
+Line chart: Cash flow over time.
+Pie chart: Revenue by consultation/procedure type.
+Table: Transaction details (date, amount, status).
+Export as PDF/CSV.
+
+3.7 System Configurations
+Consultation Types:
+Admins define types (e.g., Cleaning, Root Canal) with prices.
+
+Procedure Types:
+Admins define types (e.g., Filling, Extraction) with prices and categories.
+
+User Types:
+Admins define types (e.g., Admin, Employer, Doctor) with acess permition..
+
+
+4. Non-Functional Requirements
+Performance:
+Page load times <2 seconds.
+Support up to 50 concurrent users.
+
+Security:
+Encrypt patient and financial data (in transit and at rest).
+Role-based access enforced at API level.
+Secure password storage (hashed).
+
+Usability:
+Intuitive dashboard with quick access to appointments, transactions, and patient records.
+Responsive design for desktop/tablet/mobile.
+Dark and light theme support.
+
+Reliability:
+99.9% uptime.
+Data backups daily.
+
+
+5. User Flow
+Login: User authenticates with email/password.
+Dashboard: View upcoming appointments, recent transactions, quick links.
+Schedule Appointment:
+Search/register patient → Select consultation type → Choose doctor → Pick date/time → Save (Scheduled status).
+
+Complete Consultation:
+Mark appointment as Completed → Generates pending transaction.
+
+Record Procedure:
+Select patient → Add procedure(s) → Assign doctor(s) → Save to clinical history and generate transaction.
+
+Update Transaction:
+Mark as Paid/Overdue → Update financial records.
+
+View Patient History:
+Search patient → View profile, clinical history, consultations/procedures.
+
+Generate Reports:
+Filter by period/type → View charts/tables → Export.
+
+
+6. Future Enhancements
+Payment gateway integration.
+Email/SMS reminders for appointments.
+Mobile app for doctors.
+Advanced analytics (e.g., revenue forecasting).
