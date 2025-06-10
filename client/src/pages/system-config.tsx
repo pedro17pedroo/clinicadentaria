@@ -44,6 +44,7 @@ export default function SystemConfig() {
   const [activeTab, setActiveTab] = useState("consultations");
   const [isConsultationDialogOpen, setIsConsultationDialogOpen] = useState(false);
   const [isProcedureDialogOpen, setIsProcedureDialogOpen] = useState(false);
+  const [isTransactionTypeDialogOpen, setIsTransactionTypeDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const { data: consultationTypes } = useQuery({
