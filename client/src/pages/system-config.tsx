@@ -30,8 +30,15 @@ const procedureTypeSchema = z.object({
   description: z.string().optional(),
 });
 
+const transactionTypeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  category: z.enum(["income", "expense"], { required_error: "Category is required" }),
+  description: z.string().optional(),
+});
+
 type ConsultationTypeFormData = z.infer<typeof consultationTypeSchema>;
 type ProcedureTypeFormData = z.infer<typeof procedureTypeSchema>;
+type TransactionTypeFormData = z.infer<typeof transactionTypeSchema>;
 
 export default function SystemConfig() {
   const [activeTab, setActiveTab] = useState("consultations");

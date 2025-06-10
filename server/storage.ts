@@ -3,6 +3,7 @@ import {
   patients,
   consultationTypes,
   procedureTypes,
+  transactionTypes,
   appointments,
   procedures,
   transactions,
@@ -15,6 +16,8 @@ import {
   type InsertConsultationType,
   type ProcedureType,
   type InsertProcedureType,
+  type TransactionType,
+  type InsertTransactionType,
   type Appointment,
   type InsertAppointment,
   type Procedure,
@@ -220,6 +223,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProcedureType(id: number): Promise<void> {
     await db.update(procedureTypes).set({ isActive: false }).where(eq(procedureTypes.id, id));
+  }
+
+  // Transaction type operations
+  async getTransactionTypes(): Promise<TransactionType[]> {
+    return await db.select().from(transactionTypes).where(eq(transactionTypes.isActive, true));
+  }
+
+  async getTransactionType(id: number): Promise<TransactionType | undefined> {
+    const [transactionType] = await db.select().from(transactionTypes).where(eq(transactionTypes.id, id));
+    return transactionType;
+  }
+
+  async createTransactionType(transactionType: InsertTransactionType): Promise<TransactionType> {
+    const [newTransactionType] = await db.insert(transactionTypes).values(transactionType).returning();
+    return newTransactionType;
+  }
+
+  async updateTransactionType(id: number, transactionType: Partial<InsertTransactionType>): Promise<TransactionType> {
+    const [updatedTransactionType] = await db
+      .update(transactionTypes)
+      .set(transactionType)
+      .where(eq(transactionTypes.id, id))
+      .returning();
+    return updatedTransactionType;
+  }
+
+  async deleteTransactionType(id: number): Promise<void> {
+    await db.update(transactionTypes).set({ isActive: false }).where(eq(transactionTypes.id, id));
   }
 
   // Appointment operations

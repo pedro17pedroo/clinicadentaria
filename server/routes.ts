@@ -6,6 +6,7 @@ import {
   insertPatientSchema,
   insertConsultationTypeSchema,
   insertProcedureTypeSchema,
+  insertTransactionTypeSchema,
   insertAppointmentSchema,
   insertProcedureSchema,
   insertTransactionSchema,
@@ -174,6 +175,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Transaction type routes
+  app.get('/api/transaction-types', isAuthenticated, async (req, res) => {
+    try {
+      const transactionTypes = await storage.getTransactionTypes();
+      res.json(transactionTypes);
+    } catch (error) {
+      console.error("Error fetching transaction types:", error);
+      res.status(500).json({ message: "Failed to fetch transaction types" });
+    }
+  });
+
+  app.post('/api/transaction-types', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.userType !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admin role required." });
+      }
+
+      const validatedData = insertTransactionTypeSchema.parse(req.body);
+      const transactionType = await storage.createTransactionType(validatedData);
+      res.status(201).json(transactionType);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid transaction type data", errors: error.errors });
+      }
+      console.error("Error creating transaction type:", error);
+      res.status(500).json({ message: "Failed to create transaction type" });
+    }
+  });
+
+  app.put('/api/transaction-types/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.userType !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admin role required." });
+      }
+
+      const id = parseInt(req.params.id);
+      const validatedData = insertTransactionTypeSchema.partial().parse(req.body);
+      const transactionType = await storage.updateTransactionType(id, validatedData);
+      res.json(transactionType);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid transaction type data", errors: error.errors });
+      }
+      console.error("Error updating transaction type:", error);
+      res.status(500).json({ message: "Failed to update transaction type" });
+    }
+  });
+
+  app.delete('/api/transaction-types/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const user = await storage.getUser(req.user.claims.sub);
+      if (user?.userType !== 'admin') {
+        return res.status(403).json({ message: "Access denied. Admin role required." });
+      }
+
+      const id = parseInt(req.params.id);
+      await storage.deleteTransactionType(id);
+      res.json({ message: "Transaction type deactivated successfully" });
+    } catch (error) {
+      console.error("Error deleting transaction type:", error);
+      res.status(500).json({ message: "Failed to delete transaction type" });
+    }
+  });
+
   // Appointment routes
   app.get('/api/appointments', isAuthenticated, async (req, res) => {
     try {
@@ -229,8 +299,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.createTransaction({
             patientId: appointmentData!.patientId,
             appointmentId: id,
+            transactionTypeId: 1, // Consultation Fee
             amount: consultationType.price,
-            type: 'consultation',
             status: 'pending',
             description: `Consultation: ${consultationType.name}`,
             dueDate: new Date().toISOString().split('T')[0],
@@ -304,8 +374,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.createTransaction({
         patientId: procedure.patientId,
         procedureId: procedure.id,
+        transactionTypeId: 2, // Procedure Payment
         amount: procedure.cost,
-        type: 'procedure',
         status: 'pending',
         description: `Procedure: ${procedureType.name}`,
         dueDate: new Date().toISOString().split('T')[0],
