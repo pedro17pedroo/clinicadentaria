@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: hsl(0, 0%, 100%);
+  --foreground: hsl(224, 71.4%, 4.1%);
+  --muted: hsl(220, 14.3%, 95.9%);
+  --muted-foreground: hsl(220, 8.9%, 46.1%);
+  --popover: hsl(0, 0%, 100%);
+  --popover-foreground: hsl(224, 71.4%, 4.1%);
+  --card: hsl(0, 0%, 100%);
+  --card-foreground: hsl(224, 71.4%, 4.1%);
+  --border: hsl(220, 13%, 91%);
+  --input: hsl(220, 13%, 91%);
+  --primary: hsl(221, 83%, 53%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(220, 14.3%, 95.9%);
+  --secondary-foreground: hsl(220, 9%, 46%);
+  --accent: hsl(220, 14.3%, 95.9%);
+  --accent-foreground: hsl(220, 9%, 46%);
+  --destructive: hsl(0, 84.2%, 60.2%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(221, 83%, 53%);
+  --radius: 0.5rem;
+  --chart-1: hsl(221, 83%, 53%);
+  --chart-2: hsl(160, 60%, 45%);
+  --chart-3: hsl(30, 80%, 55%);
+  --chart-4: hsl(280, 65%, 60%);
+  --chart-5: hsl(340, 75%, 55%);
+  --sidebar-background: hsl(0, 0%, 100%);
+  --sidebar-foreground: hsl(224, 71.4%, 4.1%);
+  --sidebar-primary: hsl(221, 83%, 53%);
+  --sidebar-primary-foreground: hsl(210, 40%, 98%);
+  --sidebar-accent: hsl(220, 14.3%, 95.9%);
+  --sidebar-accent-foreground: hsl(220, 9%, 46%);
+  --sidebar-border: hsl(220, 13%, 91%);
+  --sidebar-ring: hsl(221, 83%, 53%);
+}
+
+.dark {
+  --background: hsl(224, 71.4%, 4.1%);
+  --foreground: hsl(210, 40%, 98%);
+  --muted: hsl(223, 47%, 11%);
+  --muted-foreground: hsl(215, 20.2%, 65.1%);
+  --popover: hsl(224, 71.4%, 4.1%);
+  --popover-foreground: hsl(210, 40%, 98%);
+  --card: hsl(224, 71.4%, 4.1%);
+  --card-foreground: hsl(210, 40%, 98%);
+  --border: hsl(216, 12.2%, 16.9%);
+  --input: hsl(216, 12.2%, 16.9%);
+  --primary: hsl(221, 83%, 53%);
+  --primary-foreground: hsl(210, 40%, 98%);
+  --secondary: hsl(223, 47%, 11%);
+  --secondary-foreground: hsl(210, 40%, 98%);
+  --accent: hsl(223, 47%, 11%);
+  --accent-foreground: hsl(210, 40%, 98%);
+  --destructive: hsl(0, 62.8%, 30.6%);
+  --destructive-foreground: hsl(210, 40%, 98%);
+  --ring: hsl(216, 12.2%, 83.9%);
+  --chart-1: hsl(221, 83%, 53%);
+  --chart-2: hsl(160, 60%, 45%);
+  --chart-3: hsl(30, 80%, 55%);
+  --chart-4: hsl(280, 65%, 60%);
+  --chart-5: hsl(340, 75%, 55%);
+  --sidebar-background: hsl(224, 71.4%, 4.1%);
+  --sidebar-foreground: hsl(210, 40%, 98%);
+  --sidebar-primary: hsl(221, 83%, 53%);
+  --sidebar-primary-foreground: hsl(210, 40%, 98%);
+  --sidebar-accent: hsl(223, 47%, 11%);
+  --sidebar-accent-foreground: hsl(210, 40%, 98%);
+  --sidebar-border: hsl(216, 12.2%, 16.9%);
+  --sidebar-ring: hsl(221, 83%, 53%);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Custom dental clinic theme colors */
+.medical-blue {
+  color: hsl(221, 83%, 53%);
+}
+
+.success-green {
+  color: hsl(160, 60%, 45%);
+}
+
+.alert-red {
+  color: hsl(0, 84.2%, 60.2%);
+}
+
+.bg-medical-blue {
+  background-color: hsl(221, 83%, 53%);
+}
+
+.bg-success-green {
+  background-color: hsl(160, 60%, 45%);
+}
+
+.bg-alert-red {
+  background-color: hsl(0, 84.2%, 60.2%);
+}
