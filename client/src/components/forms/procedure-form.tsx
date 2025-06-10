@@ -1,4 +1,5 @@
-import { useForm } from "react-hook-form";
+import { useState, useEffect } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
@@ -7,24 +8,29 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, Trash2, DollarSign } from "lucide-react";
 
-const procedureSchema = z.object({
-  patientId: z.number().min(1, "Please select a patient"),
+const procedureItemSchema = z.object({
   procedureTypeId: z.number().min(1, "Please select a procedure type"),
   doctorId: z.string().min(1, "Please select a doctor"),
-  date: z.string().min(1, "Please select a date"),
   notes: z.string().optional(),
-  appointmentId: z.number().optional(),
 });
 
-type ProcedureFormData = z.infer<typeof procedureSchema>;
+const procedureFormSchema = z.object({
+  procedures: z.array(procedureItemSchema).min(1, "At least one procedure is required"),
+  date: z.string().min(1, "Please select a date"),
+});
+
+type ProcedureFormData = z.infer<typeof procedureFormSchema>;
 
 interface ProcedureFormProps {
   onSuccess?: () => void;
   appointmentId?: number;
+  patientId?: number;
 }
 
 export function ProcedureForm({ onSuccess, appointmentId }: ProcedureFormProps) {

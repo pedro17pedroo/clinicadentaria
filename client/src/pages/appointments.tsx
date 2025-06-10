@@ -5,8 +5,9 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, User, Plus, Edit, CheckCircle } from "lucide-react";
+import { Calendar, Clock, User, Plus, Edit, CheckCircle, Activity } from "lucide-react";
 import { AppointmentForm } from "@/components/forms/appointment-form";
+import { ProcedureForm } from "@/components/forms/procedure-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -14,6 +15,8 @@ import { format } from "date-fns";
 
 export default function Appointments() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isProcedureOpen, setIsProcedureOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const { toast } = useToast();
 
@@ -54,6 +57,11 @@ export default function Appointments() {
       id: appointmentId,
       data: { status: "completed" }
     });
+  };
+
+  const handleRecordProcedures = (appointment: any) => {
+    setSelectedAppointment(appointment);
+    setIsProcedureOpen(true);
   };
 
   const getStatusColor = (status: string) => {
@@ -181,6 +189,16 @@ export default function Appointments() {
                             Complete
                           </Button>
                         )}
+                        {appointment.status === "completed" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRecordProcedures(appointment)}
+                          >
+                            <Activity className="h-4 w-4 mr-1" />
+                            Record Procedures
+                          </Button>
+                        )}
                         <Button size="sm" variant="outline">
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
@@ -193,6 +211,22 @@ export default function Appointments() {
             )}
           </CardContent>
         </Card>
+
+        {/* Procedure Recording Dialog */}
+        <Dialog open={isProcedureOpen} onOpenChange={setIsProcedureOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Record Procedures for Consultation</DialogTitle>
+            </DialogHeader>
+            {selectedAppointment && (
+              <ProcedureForm 
+                appointmentId={selectedAppointment.id}
+                patientId={selectedAppointment.patientId}
+                onSuccess={() => setIsProcedureOpen(false)} 
+              />
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
