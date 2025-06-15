@@ -18,7 +18,7 @@ export function FinancialOverview() {
 
   const getPatientName = (patientId: number) => {
     const patient = patients?.find((p: any) => p.id === patientId);
-    return patient?.name || "Unknown Patient";
+    return patient?.name || "Paciente Desconhecido";
   };
 
   const getPatientInitials = (patientId: number) => {
@@ -78,16 +78,16 @@ export function FinancialOverview() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center space-x-2">
               <TrendingUp className="h-5 w-5" />
-              <span>Revenue Overview</span>
+              <span>Visão Geral da Receita</span>
             </CardTitle>
             <Select defaultValue="30">
               <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 3 months</SelectItem>
+                <SelectItem value="7">Últimos 7 dias</SelectItem>
+                <SelectItem value="30">Últimos 30 dias</SelectItem>
+                <SelectItem value="90">Últimos 3 meses</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -96,8 +96,8 @@ export function FinancialOverview() {
           <div className="h-64 bg-gradient-to-r from-primary/5 to-green-500/5 rounded-lg flex items-center justify-center border border-border">
             <div className="text-center">
               <TrendingUp className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-              <p className="text-muted-foreground">Revenue Chart</p>
-              <p className="text-sm text-muted-foreground/70">Interactive chart will be displayed here</p>
+              <p className="text-muted-foreground">Gráfico de Receita</p>
+              <p className="text-sm text-muted-foreground/70">Gráfico interativo será exibido aqui</p>
             </div>
           </div>
         </CardContent>
@@ -109,11 +109,11 @@ export function FinancialOverview() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center space-x-2">
               <DollarSign className="h-5 w-5" />
-              <span>Recent Payments</span>
+              <span>Pagamentos Recentes</span>
             </CardTitle>
             <Link href="/finances">
               <Button variant="link" className="text-primary p-0">
-                View All
+                Ver Todos
               </Button>
             </Link>
           </div>
@@ -122,7 +122,7 @@ export function FinancialOverview() {
           {recentTransactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No recent transactions</p>
+              <p>Nenhuma transação recente</p>
             </div>
           ) : (
             recentTransactions.map((transaction: any) => (
@@ -147,11 +147,16 @@ export function FinancialOverview() {
                 </div>
                 <div className="text-right">
                   <p className="font-semibold text-foreground">
-                    ${Number(transaction.amount).toFixed(2)}
+                    {new Intl.NumberFormat('pt-AO', {
+                      style: 'currency',
+                      currency: 'AOA'
+                    }).format(Number(transaction.amount))}
                   </p>
                   <Badge className={getStatusColor(transaction.status)}>
                     {getStatusIcon(transaction.status)}
-                    {transaction.status}
+                    {transaction.status === 'paid' ? 'Pago' : 
+                     transaction.status === 'pending' ? 'Pendente' : 
+                     transaction.status === 'overdue' ? 'Em Atraso' : transaction.status}
                   </Badge>
                 </div>
               </div>

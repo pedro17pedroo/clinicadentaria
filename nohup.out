@@ -1,0 +1,18 @@
+(node:74441) [MONGOOSE] Warning: Duplicate schema index on {"email":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:74441) [MONGOOSE] Warning: Duplicate schema index on {"cpf":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+🔗 Mongoose conectado ao MongoDB
+✅ MongoDB conectado com sucesso!
+📊 Base de dados: clinica_dentaria
+🌐 Host: localhost:27017
+10:17:33 PM [express] 🚀 Servidor rodando na porta 3000
+10:17:33 PM [express] 🌐 Acesse: http://localhost:3000
+10:17:40 PM [express] GET /api/consultation-type-configs 200 in 29ms
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+10:17:56 PM [express] GET /api/consultation-types 401 in 4ms :: {"message":"Token de acesso requerido…
+10:18:13 PM [express] GET /api/consultation-types 401 in 8ms :: {"message":"Token inválido"}
+10:18:24 PM [vite] hmr update /src/pages/doctor-management.tsx, /src/index.css?v=pvMZ6h1sPyCzN0r1p_fxn
+10:18:25 PM [vite] hmr update /src/pages/doctor-management.tsx, /src/index.css?v=pvMZ6h1sPyCzN0r1p_fxn
+10:18:25 PM [vite] hmr update /src/pages/doctor-management.tsx, /src/index.css?v=pvMZ6h1sPyCzN0r1p_fxn

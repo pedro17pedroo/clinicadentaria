@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -8,39 +8,77 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus, UserPlus } from "lucide-react";
+import { PatientForm } from "@/components/forms/patient-form";
 
 const appointmentSchema = z.object({
-  patientId: z.number().min(1, "Please select a patient"),
-  consultationTypeId: z.number().min(1, "Please select a consultation type"),
-  doctorId: z.string().min(1, "Please select a doctor"),
-  date: z.string().min(1, "Please select a date"),
-  time: z.string().min(1, "Please select a time"),
+  patientId: z.string().min(1, "Paciente é obrigatório"),
+  consultationTypeId: z.string().min(1, "Tipo de consulta é obrigatório"),
+  doctorId: z.string().min(1, "Médico é obrigatório"),
+  date: z.string().min(1, "Data é obrigatória"),
+  time: z.string().min(1, "Horário é obrigatório"),
 });
 
 type AppointmentFormData = z.infer<typeof appointmentSchema>;
 
 interface AppointmentFormProps {
   onSuccess?: () => void;
+  onCancel?: () => void;
+  appointment?: any; // Para edição
 }
 
-export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
+export function AppointmentForm({ onSuccess, onCancel, appointment }: AppointmentFormProps) {
   const [selectedDoctor, setSelectedDoctor] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedConsultationType, setSelectedConsultationType] = useState<string | null>(null);
+  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
+  const [searchPatient, setSearchPatient] = useState("");
   const { toast } = useToast();
 
-  const form = useForm<AppointmentFormData>({
+  const form = useForm<z.infer<typeof appointmentSchema>>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
-      patientId: 0,
-      consultationTypeId: 0,
-      doctorId: "",
-      date: "",
-      time: "",
+      patientId: appointment?.patient?._id || "",
+      consultationTypeId: appointment?.consultationType?._id || "",
+      doctorId: appointment?.doctor?._id || "",
+      date: appointment?.date ? new Date(appointment.date).toISOString().split('T')[0] : "",
+      time: appointment?.time || "",
     },
   });
+
+  // Inicializar estados e formulário quando estiver editando
+  React.useEffect(() => {
+    if (appointment) {
+      console.log('Appointment data:', appointment);
+      
+      const formData = {
+        patientId: appointment.patientId?._id || appointment.patient?._id || "",
+        consultationTypeId: appointment.consultationTypeId?._id || appointment.consultationType?._id || "",
+        doctorId: appointment.doctorId?._id || appointment.doctor?._id || "",
+        date: appointment.date ? new Date(appointment.date).toISOString().split('T')[0] : "",
+        time: appointment.time || "",
+      };
+      
+      console.log('Form data to reset:', formData);
+      
+      // Resetar o formulário com os novos valores
+      form.reset(formData);
+      
+      // Atualizar os estados
+      setSelectedDoctor(appointment.doctorId?._id || appointment.doctor?._id || "");
+      setSelectedDate(appointment.date ? new Date(appointment.date).toISOString().split('T')[0] : "");
+      setSelectedConsultationType(appointment.consultationTypeId?._id || appointment.consultationType?._id || "");
+      
+      console.log('States updated:', {
+        selectedDoctor: appointment.doctorId?._id || appointment.doctor?._id,
+        selectedDate: appointment.date ? new Date(appointment.date).toISOString().split('T')[0] : "",
+        selectedConsultationType: appointment.consultationTypeId?._id || appointment.consultationType?._id
+      });
+    }
+  }, [appointment, form]);
 
   const { data: patients } = useQuery({
     queryKey: ["/api/patients"],
@@ -50,34 +88,120 @@ export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
     queryKey: ["/api/consultation-types"],
   });
 
-  // For now, we'll use a static list of doctors since we don't have a separate doctors endpoint
-  const doctors = [
-    { id: "dr-johnson", name: "Dr. Sarah Johnson" },
-    { id: "dr-chen", name: "Dr. Michael Chen" },
-    { id: "dr-williams", name: "Dr. Emily Williams" },
-  ];
+  // Buscar médicos (usuários com userType = 'doctor')
+  const { data: allDoctors } = useQuery({
+    queryKey: ["/api/users"],
+  });
 
-  const { data: availableTimes } = useQuery({
-    queryKey: ["/api/doctors", selectedDoctor, "availability", { date: selectedDate }],
+  // Filtrar médicos por tipo de consulta selecionado
+  const availableDoctors = React.useMemo(() => {
+    if (!allDoctors || !selectedConsultationType) return [];
+    
+    const selectedType = consultationTypes?.find((ct: any) => ct._id === selectedConsultationType);
+    if (!selectedType) return [];
+    
+    return allDoctors
+      .filter((user: any) => user.userType === 'doctor' && user.isActive)
+      .filter((doctor: any) => {
+        // Se o médico não tem tipos de consulta definidos, pode atender todos
+        if (!doctor.consultationTypes || doctor.consultationTypes.length === 0) return true;
+        // Verificar se o médico atende este tipo de consulta
+        return doctor.consultationTypes.includes(selectedType.name) || 
+               doctor.consultationTypes.includes(selectedType._id?.toString());
+      })
+      .map((doctor: any) => ({
+        id: doctor._id,
+        name: doctor.firstName && doctor.lastName 
+          ? `Dr. ${doctor.firstName} ${doctor.lastName}`
+          : doctor.name 
+            ? `Dr. ${doctor.name}`
+            : `Dr. ${doctor.email?.split('@')[0] || 'Médico'}`,
+        workingDays: doctor.workingDays || [],
+        workingHours: doctor.workingHours || { start: '09:00', end: '17:00' },
+        dailySchedules: doctor.dailySchedules || {}
+      }));
+  }, [allDoctors, selectedConsultationType, consultationTypes]);
+
+  // Buscar horários ocupados do médico na data selecionada
+  const { data: occupiedTimes } = useQuery({
+    queryKey: ["/api/doctors", selectedDoctor, "availability", selectedDate],
+    queryFn: async () => {
+      if (!selectedDoctor || !selectedDate) return [];
+      const response = await apiRequest("GET", `/api/doctors/${selectedDoctor}/availability?date=${selectedDate}`);
+      return response as string[];
+    },
     enabled: !!(selectedDoctor && selectedDate),
   });
 
-  const createAppointmentMutation = useMutation({
+  // Gerar horários disponíveis baseados no cronograma do médico
+  const availableTimes = React.useMemo(() => {
+    if (!selectedDoctor || !selectedDate || !availableDoctors.length) return [];
+    
+    const doctor = availableDoctors.find(d => d.id === selectedDoctor);
+    if (!doctor) return [];
+    
+    const selectedDateObj = new Date(selectedDate);
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayName = dayNames[selectedDateObj.getDay()];
+    
+    // Verificar se o médico trabalha neste dia
+    if (doctor.workingDays.length > 0 && !doctor.workingDays.includes(dayName)) {
+      return [];
+    }
+    
+    // Obter horário de trabalho para o dia específico ou horário padrão
+    let workingHours = doctor.workingHours;
+    if (doctor.dailySchedules && doctor.dailySchedules[dayName] && doctor.dailySchedules[dayName].isActive) {
+      workingHours = {
+        start: doctor.dailySchedules[dayName].start,
+        end: doctor.dailySchedules[dayName].end
+      };
+    }
+    
+    // Gerar slots de 30 minutos
+    const times = [];
+    const startTime = new Date(`2000-01-01T${workingHours.start}:00`);
+    const endTime = new Date(`2000-01-01T${workingHours.end}:00`);
+    
+    let currentTime = new Date(startTime);
+    while (currentTime < endTime) {
+      const timeString = currentTime.toTimeString().substring(0, 5);
+      
+      // Verificar se este horário não está ocupado
+      const occupiedTimesArray = Array.isArray(occupiedTimes) ? occupiedTimes : [];
+      if (!occupiedTimesArray.includes(timeString)) {
+        times.push(timeString);
+      }
+      
+      // Adicionar 30 minutos
+      currentTime.setMinutes(currentTime.getMinutes() + 30);
+    }
+    
+    return times;
+  }, [selectedDoctor, selectedDate, availableDoctors, occupiedTimes]);
+
+  const appointmentMutation = useMutation({
     mutationFn: async (data: AppointmentFormData) => {
-      await apiRequest("POST", "/api/appointments", data);
+      if (appointment) {
+        // Editar consulta existente
+        await apiRequest("PUT", `/api/appointments/${appointment._id}`, data);
+      } else {
+        // Criar nova consulta
+        await apiRequest("POST", "/api/appointments", data);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
       toast({
-        title: "Success",
-        description: "Appointment scheduled successfully",
+        title: "Sucesso",
+        description: appointment ? "Consulta atualizada com sucesso" : "Consulta agendada com sucesso",
       });
       form.reset();
       onSuccess?.();
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Erro",
         description: error.message,
         variant: "destructive",
       });
@@ -85,7 +209,7 @@ export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
   });
 
   const onSubmit = (data: AppointmentFormData) => {
-    createAppointmentMutation.mutate(data);
+    appointmentMutation.mutate(data);
   };
 
   const watchedValues = form.watch();
@@ -98,24 +222,76 @@ export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
           name="patientId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Patient</FormLabel>
-              <Select
-                onValueChange={(value) => field.onChange(parseInt(value))}
-                value={field.value?.toString() || ""}
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a patient" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {patients?.map((patient: any) => (
-                    <SelectItem key={patient.id} value={patient.id.toString()}>
-                      {patient.name} - {patient.cpf}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormLabel>Paciente</FormLabel>
+              <div className="flex space-x-2">
+                <div className="flex-1">
+                  <div className="mb-2">
+                    <Input
+                      placeholder="Pesquisar paciente por nome ou DI..."
+                      value={searchPatient}
+                      onChange={(e) => setSearchPatient(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+                  <Select
+                    onValueChange={(value) => field.onChange(value)}
+                    value={field.value || ""}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um paciente" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {patients && Array.isArray(patients) ? 
+                        patients
+                          .filter((patient: any) => {
+                            if (!searchPatient) return true;
+                            const searchLower = searchPatient.toLowerCase();
+                            return patient.name?.toLowerCase().includes(searchLower) ||
+                                   patient.di?.toLowerCase().includes(searchLower);
+                          })
+                          .map((patient: any) => (
+                            patient._id ? (
+                              <SelectItem key={patient._id} value={patient._id}>
+                                {patient.name}{patient.di ? ` - ${patient.di}` : ''}
+                              </SelectItem>
+                            ) : null
+                          )).filter(Boolean) : (
+                        <SelectItem value="no-patients" disabled>
+                          Nenhum paciente disponível
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Dialog open={isAddPatientOpen} onOpenChange={setIsAddPatientOpen}>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline" size="icon">
+                      <UserPlus className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Adicionar Novo Paciente</DialogTitle>
+                      <DialogDescription>
+                        Adicione um novo paciente para poder agendar a consulta.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <PatientForm 
+                      onSuccess={() => {
+                        setIsAddPatientOpen(false);
+                        // Invalidar cache de pacientes para recarregar a lista
+                        queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+                        toast({
+                          title: "Sucesso",
+                          description: "Paciente adicionado! Agora você pode selecioná-lo na lista.",
+                        });
+                      }} 
+                    />
+                  </DialogContent>
+                </Dialog>
+              </div>
               <FormMessage />
             </FormItem>
           )}
@@ -126,22 +302,35 @@ export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
           name="consultationTypeId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Consultation Type</FormLabel>
+              <FormLabel>Tipo de Consulta</FormLabel>
               <Select
-                onValueChange={(value) => field.onChange(parseInt(value))}
-                value={field.value?.toString() || ""}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  setSelectedConsultationType(value);
+                  // Reset médico e horário quando tipo de consulta muda
+                  form.setValue("doctorId", "");
+                  form.setValue("time", "");
+                  setSelectedDoctor("");
+                }}
+                value={field.value || ""}
               >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select consultation type" />
+                    <SelectValue placeholder="Selecione o tipo de consulta" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {consultationTypes?.map((type: any) => (
-                    <SelectItem key={type.id} value={type.id.toString()}>
-                      {type.name} - ${Number(type.price).toFixed(2)}
+                  {consultationTypes && Array.isArray(consultationTypes) ? consultationTypes.map((type: any) => (
+                    type._id ? (
+                      <SelectItem key={type._id} value={type._id}>
+                        {type.name} - {Number(type.price).toFixed(2)} Kz
+                      </SelectItem>
+                    ) : null
+                  )) : (
+                    <SelectItem value="no-consultation-types" disabled>
+                      Nenhum tipo de consulta disponível
                     </SelectItem>
-                  ))}
+                  )}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -154,25 +343,48 @@ export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
           name="doctorId"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Doctor</FormLabel>
+              <FormLabel>Médico</FormLabel>
               <Select
                 onValueChange={(value) => {
                   field.onChange(value);
                   setSelectedDoctor(value);
+                  // Reset horário quando médico muda
+                  form.setValue("time", "");
                 }}
                 value={field.value}
+                disabled={!selectedConsultationType}
               >
                 <FormControl>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a doctor" />
+                    <SelectValue placeholder={
+                      !selectedConsultationType 
+                        ? "Selecione primeiro o tipo de consulta" 
+                        : availableDoctors.length === 0 
+                        ? "Nenhum médico disponível para este tipo de consulta"
+                        : "Selecione um médico"
+                    } />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {doctors.map((doctor) => (
+                  {availableDoctors.length > 0 ? availableDoctors.map((doctor) => (
                     <SelectItem key={doctor.id} value={doctor.id}>
-                      {doctor.name}
+                      <div className="flex flex-col">
+                        <span>{doctor.name}</span>
+                        <span className="text-xs text-muted-foreground">
+                          Dias: {doctor.workingDays.length > 0 ? doctor.workingDays.join(', ') : 'Todos os dias'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Horário: {doctor.workingHours.start} - {doctor.workingHours.end}
+                        </span>
+                      </div>
                     </SelectItem>
-                  ))}
+                  )) : (
+                    <SelectItem value="no-doctors" disabled>
+                      {!selectedConsultationType 
+                        ? "Selecione primeiro o tipo de consulta"
+                        : "Nenhum médico disponível para este tipo de consulta"}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -186,7 +398,7 @@ export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
             name="date"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Date</FormLabel>
+                <FormLabel>Data</FormLabel>
                 <FormControl>
                   <Input
                     type="date"
@@ -209,7 +421,7 @@ export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
             name="time"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Time</FormLabel>
+                <FormLabel>Horário</FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   value={field.value}
@@ -217,36 +429,63 @@ export function AppointmentForm({ onSuccess }: AppointmentFormProps) {
                 >
                   <FormControl>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select time" />
+                      <SelectValue placeholder={
+                        !selectedDoctor ? "Selecione primeiro o médico" :
+                        !selectedDate ? "Selecione primeiro a data" :
+                        "Selecione o horário"
+                      } />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {availableTimes?.map((time: string) => (
+                    {availableTimes && availableTimes.length > 0 ? availableTimes.map((time: string) => (
                       <SelectItem key={time} value={time}>
-                        {new Date(`2000-01-01T${time}`).toLocaleTimeString('en-US', {
+                        {new Date(`2000-01-01T${time}`).toLocaleTimeString('pt-PT', {
                           hour: 'numeric',
                           minute: '2-digit',
-                          hour12: true,
+                          hour12: false,
                         })}
                       </SelectItem>
-                    ))}
+                    )) : (
+                      <SelectItem value="no-times" disabled>
+                        {!selectedDoctor ? 'Selecione médico primeiro' : 
+                         !selectedDate ? 'Selecione data primeiro' :
+                         occupiedTimes === undefined ? 'Carregando horários...' :
+                         availableTimes?.length === 0 ? 'Médico não trabalha neste dia ou todos os horários estão ocupados' :
+                         'Nenhum horário disponível'}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 <FormMessage />
+                {selectedDoctor && selectedDate && availableTimes?.length === 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    💡 Dica: Tente selecionar outra data ou verifique os dias de trabalho do médico.
+                  </p>
+                )}
               </FormItem>
             )}
           />
         </div>
 
         <div className="flex justify-end space-x-3">
-          <Button type="button" variant="outline" onClick={() => form.reset()}>
-            Cancel
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={() => {
+              if (appointment && onCancel) {
+                onCancel();
+              } else {
+                form.reset();
+              }
+            }}
+          >
+            Cancelar
           </Button>
-          <Button type="submit" disabled={createAppointmentMutation.isPending}>
-            {createAppointmentMutation.isPending && (
+          <Button type="submit" disabled={appointmentMutation.isPending}>
+            {appointmentMutation.isPending && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            Schedule Appointment
+            {appointment ? 'Atualizar Consulta' : 'Agendar Consulta'}
           </Button>
         </div>
       </form>

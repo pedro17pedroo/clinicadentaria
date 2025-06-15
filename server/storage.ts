@@ -1,472 +1,1358 @@
 import {
-  users,
-  patients,
-  consultationTypes,
-  procedureTypes,
-  transactionTypes,
-  appointments,
-  procedures,
-  transactions,
-  userTypeConfigs,
-  type User,
-  type UpsertUser,
-  type Patient,
-  type InsertPatient,
-  type ConsultationType,
-  type InsertConsultationType,
-  type ProcedureType,
-  type InsertProcedureType,
-  type TransactionType,
-  type InsertTransactionType,
-  type Appointment,
-  type InsertAppointment,
-  type Procedure,
-  type InsertProcedure,
-  type Transaction,
-  type InsertTransaction,
-  type UserTypeConfig,
-  type InsertUserTypeConfig,
+  User,
+  Patient,
+  ConsultationType,
+  ProcedureType,
+  TransactionType,
+  Appointment,
+  Procedure,
+  Transaction,
+  UserTypeConfig,
+  type IUser,
+  type IPatient,
+  type IConsultationType,
+  type IProcedureType,
+  type ITransactionType,
+  type IAppointment,
+  type IProcedure,
+  type ITransaction,
+  type IUserTypeConfig,
+  type CreateUser,
+  type CreatePatient,
+  type CreateAppointment,
+  type CreateProcedure,
+  type CreateTransaction,
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, and, gte, lte, like, desc, asc } from "drizzle-orm";
+import { Types } from 'mongoose';
 
+/**
+ * Interface para operações de armazenamento
+ * Define todos os métodos necessários para gestão de dados
+ */
 export interface IStorage {
-  // User operations (required for Replit Auth)
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
-  updateUserType(userId: string, userType: string): Promise<User>;
+  // Operações de utilizador
+  getUsers(): Promise<IUser[]>;
+  getUser(id: string): Promise<IUser | null>;
+  upsertUser(user: Partial<IUser>): Promise<IUser>;
+  createUser(userData: Omit<IUser, '_id' | 'createdAt' | 'updatedAt'>): Promise<IUser>;
+  updateUser(id: string, userData: Partial<IUser>): Promise<IUser | null>;
+  updateUserType(userId: string, userType: string): Promise<IUser | null>;
+  updateUserStatus(userId: string, isActive: boolean): Promise<IUser | null>;
+  updateDoctorSchedule(id: string, schedule: {
+    workingDays?: string[];
+    workingHours?: { start: string; end: string };
+    dailySchedules?: {
+      [key: string]: {
+        start: string;
+        end: string;
+        isActive: boolean;
+      };
+    };
+    consultationTypes?: string[];
+    procedureTypes?: string[];
+  }): Promise<IUser | null>;
+  updateDoctorSpecialties(id: string, specialties: string[]): Promise<IUser | null>;
+  deleteUser(id: string): Promise<boolean>;
   
-  // Patient operations
-  getPatients(): Promise<Patient[]>;
-  getPatient(id: number): Promise<Patient | undefined>;
-  getPatientByCpf(cpf: string): Promise<Patient | undefined>;
-  createPatient(patient: InsertPatient): Promise<Patient>;
-  updatePatient(id: number, patient: Partial<InsertPatient>): Promise<Patient>;
-  searchPatients(query: string): Promise<Patient[]>;
+  // Operações de paciente
+  getPatients(): Promise<IPatient[]>;
+  getPatient(id: string): Promise<IPatient | null>;
+  getPatientByDi(di: string): Promise<IPatient | null>;
+  createPatient(patient: CreatePatient): Promise<IPatient>;
+  updatePatient(id: string, patient: Partial<CreatePatient>): Promise<IPatient | null>;
+  deletePatient(id: string): Promise<boolean>;
+  searchPatients(query: string): Promise<IPatient[]>;
   
-  // Consultation type operations
-  getConsultationTypes(): Promise<ConsultationType[]>;
-  getConsultationType(id: number): Promise<ConsultationType | undefined>;
-  createConsultationType(consultationType: InsertConsultationType): Promise<ConsultationType>;
-  updateConsultationType(id: number, consultationType: Partial<InsertConsultationType>): Promise<ConsultationType>;
-  deleteConsultationType(id: number): Promise<void>;
+  // Operações de tipo de consulta
+  getConsultationTypes(): Promise<IConsultationType[]>;
+  getConsultationType(id: string): Promise<IConsultationType | null>;
+  createConsultationType(consultationType: Partial<IConsultationType>): Promise<IConsultationType>;
+  updateConsultationType(id: string, consultationType: Partial<IConsultationType>): Promise<IConsultationType | null>;
+  deleteConsultationType(id: string): Promise<void>;
   
-  // Procedure type operations
-  getProcedureTypes(): Promise<ProcedureType[]>;
-  getProcedureType(id: number): Promise<ProcedureType | undefined>;
-  createProcedureType(procedureType: InsertProcedureType): Promise<ProcedureType>;
-  updateProcedureType(id: number, procedureType: Partial<InsertProcedureType>): Promise<ProcedureType>;
-  deleteProcedureType(id: number): Promise<void>;
+  // Operações de tipo de procedimento
+  getProcedureTypes(): Promise<IProcedureType[]>;
+  getProcedureType(id: string): Promise<IProcedureType | null>;
+  createProcedureType(procedureType: Partial<IProcedureType>): Promise<IProcedureType>;
+  updateProcedureType(id: string, procedureType: Partial<IProcedureType>): Promise<IProcedureType | null>;
+  deleteProcedureType(id: string): Promise<boolean>;
   
-  // Transaction type operations
-  getTransactionTypes(): Promise<TransactionType[]>;
-  getTransactionType(id: number): Promise<TransactionType | undefined>;
-  createTransactionType(transactionType: InsertTransactionType): Promise<TransactionType>;
-  updateTransactionType(id: number, transactionType: Partial<InsertTransactionType>): Promise<TransactionType>;
-  deleteTransactionType(id: number): Promise<void>;
+  // Operações de tipo de transação
+  getTransactionTypes(): Promise<ITransactionType[]>;
+  getTransactionType(id: string): Promise<ITransactionType | null>;
+  createTransactionType(transactionType: Partial<ITransactionType>): Promise<ITransactionType>;
+  updateTransactionType(id: string, transactionType: Partial<ITransactionType>): Promise<ITransactionType | null>;
+  deleteTransactionType(id: string): Promise<void>;
   
-  // Appointment operations
-  getAppointments(filters?: { date?: string; doctorId?: string; patientId?: number }): Promise<Appointment[]>;
-  getAppointment(id: number): Promise<Appointment | undefined>;
-  createAppointment(appointment: InsertAppointment): Promise<Appointment>;
-  updateAppointment(id: number, appointment: Partial<InsertAppointment>): Promise<Appointment>;
-  deleteAppointment(id: number): Promise<void>;
+  // Operações de consulta
+  getAppointments(filters?: { date?: string; doctorId?: string; patientId?: string }): Promise<IAppointment[]>;
+  getAppointment(id: string): Promise<IAppointment | null>;
+  createAppointment(appointment: CreateAppointment): Promise<IAppointment>;
+  updateAppointment(id: string, appointment: Partial<CreateAppointment>): Promise<IAppointment | null>;
+  deleteAppointment(id: string): Promise<void>;
   getDoctorAvailability(doctorId: string, date: string): Promise<string[]>;
   
-  // Procedure operations
-  getProcedures(filters?: { patientId?: number; doctorId?: string; appointmentId?: number }): Promise<Procedure[]>;
-  getProcedure(id: number): Promise<Procedure | undefined>;
-  createProcedure(procedure: InsertProcedure): Promise<Procedure>;
-  updateProcedure(id: number, procedure: Partial<InsertProcedure>): Promise<Procedure>;
+  // Operações de procedimento
+  getProcedures(filters?: { patientId?: string; doctorId?: string; appointmentId?: string }): Promise<IProcedure[]>;
+  getProcedure(id: string): Promise<IProcedure | null>;
+  createProcedure(procedure: CreateProcedure): Promise<IProcedure>;
+  updateProcedure(id: string, procedure: Partial<CreateProcedure>): Promise<IProcedure | null>;
   
-  // Transaction operations
-  getTransactions(filters?: { patientId?: number; status?: string; dateFrom?: string; dateTo?: string }): Promise<Transaction[]>;
-  getTransaction(id: number): Promise<Transaction | undefined>;
-  createTransaction(transaction: InsertTransaction): Promise<Transaction>;
-  updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction>;
+  // Operações de transação
+  getTransactions(filters?: { patientId?: string; status?: string; dateFrom?: string; dateTo?: string }): Promise<ITransaction[]>;
+  getTransaction(id: string): Promise<ITransaction | null>;
+  createTransaction(transaction: CreateTransaction): Promise<ITransaction>;
+  updateTransaction(id: string, transaction: Partial<CreateTransaction>): Promise<ITransaction | null>;
+  deleteTransaction(id: string): Promise<boolean>;
   
-  // User type config operations
-  getUserTypeConfigs(): Promise<UserTypeConfig[]>;
-  getUserTypeConfig(id: number): Promise<UserTypeConfig | undefined>;
-  createUserTypeConfig(config: InsertUserTypeConfig): Promise<UserTypeConfig>;
-  updateUserTypeConfig(id: number, config: Partial<InsertUserTypeConfig>): Promise<UserTypeConfig>;
-  deleteUserTypeConfig(id: number): Promise<void>;
+  // Operações de configuração de tipo de utilizador
+  getUserTypeConfigs(): Promise<IUserTypeConfig[]>;
+  getUserTypeConfig(id: string): Promise<IUserTypeConfig | null>;
+  createUserTypeConfig(config: Partial<IUserTypeConfig>): Promise<IUserTypeConfig>;
+  updateUserTypeConfig(id: string, config: Partial<IUserTypeConfig>): Promise<IUserTypeConfig | null>;
+  deleteUserTypeConfig(id: string): Promise<void>;
   
-  // Dashboard metrics
+  // Métricas do dashboard
   getDashboardMetrics(): Promise<{
     todayAppointments: number;
     pendingPayments: number;
     monthlyRevenue: number;
     activePatients: number;
+    recentAppointments: IAppointment[];
+    recentTransactions: ITransaction[];
+  }>;
+  
+  // Relatórios financeiros
+  getFinancialReport(dateFrom: string, dateTo: string): Promise<{
+    totalRevenue: number;
+    totalExpenses: number;
+    netProfit: number;
+    transactionsByType: Array<{ type: string; amount: number; count: number }>;
+    dailyRevenue: Array<{ date: string; amount: number }>;
   }>;
 }
 
-export class DatabaseStorage implements IStorage {
-  // User operations
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
-  }
-
-  async updateUserType(userId: string, userType: string): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({ userType, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning();
-    return user;
-  }
-
-  // Patient operations
-  async getPatients(): Promise<Patient[]> {
-    return await db.select().from(patients).orderBy(asc(patients.name));
-  }
-
-  async getPatient(id: number): Promise<Patient | undefined> {
-    const [patient] = await db.select().from(patients).where(eq(patients.id, id));
-    return patient;
-  }
-
-  async getPatientByCpf(cpf: string): Promise<Patient | undefined> {
-    const [patient] = await db.select().from(patients).where(eq(patients.cpf, cpf));
-    return patient;
-  }
-
-  async createPatient(patient: InsertPatient): Promise<Patient> {
-    const [newPatient] = await db.insert(patients).values(patient).returning();
-    return newPatient;
-  }
-
-  async updatePatient(id: number, patient: Partial<InsertPatient>): Promise<Patient> {
-    const [updatedPatient] = await db
-      .update(patients)
-      .set({ ...patient, updatedAt: new Date() })
-      .where(eq(patients.id, id))
-      .returning();
-    return updatedPatient;
-  }
-
-  async searchPatients(query: string): Promise<Patient[]> {
-    return await db
-      .select()
-      .from(patients)
-      .where(like(patients.name, `%${query}%`))
-      .orderBy(asc(patients.name));
-  }
-
-  // Consultation type operations
-  async getConsultationTypes(): Promise<ConsultationType[]> {
-    return await db.select().from(consultationTypes).where(eq(consultationTypes.isActive, true));
-  }
-
-  async getConsultationType(id: number): Promise<ConsultationType | undefined> {
-    const [consultationType] = await db.select().from(consultationTypes).where(eq(consultationTypes.id, id));
-    return consultationType;
-  }
-
-  async createConsultationType(consultationType: InsertConsultationType): Promise<ConsultationType> {
-    const [newConsultationType] = await db.insert(consultationTypes).values(consultationType).returning();
-    return newConsultationType;
-  }
-
-  async updateConsultationType(id: number, consultationType: Partial<InsertConsultationType>): Promise<ConsultationType> {
-    const [updatedConsultationType] = await db
-      .update(consultationTypes)
-      .set(consultationType)
-      .where(eq(consultationTypes.id, id))
-      .returning();
-    return updatedConsultationType;
-  }
-
-  async deleteConsultationType(id: number): Promise<void> {
-    await db.update(consultationTypes).set({ isActive: false }).where(eq(consultationTypes.id, id));
-  }
-
-  // Procedure type operations
-  async getProcedureTypes(): Promise<ProcedureType[]> {
-    return await db.select().from(procedureTypes).where(eq(procedureTypes.isActive, true));
-  }
-
-  async getProcedureType(id: number): Promise<ProcedureType | undefined> {
-    const [procedureType] = await db.select().from(procedureTypes).where(eq(procedureTypes.id, id));
-    return procedureType;
-  }
-
-  async createProcedureType(procedureType: InsertProcedureType): Promise<ProcedureType> {
-    const [newProcedureType] = await db.insert(procedureTypes).values(procedureType).returning();
-    return newProcedureType;
-  }
-
-  async updateProcedureType(id: number, procedureType: Partial<InsertProcedureType>): Promise<ProcedureType> {
-    const [updatedProcedureType] = await db
-      .update(procedureTypes)
-      .set(procedureType)
-      .where(eq(procedureTypes.id, id))
-      .returning();
-    return updatedProcedureType;
-  }
-
-  async deleteProcedureType(id: number): Promise<void> {
-    await db.update(procedureTypes).set({ isActive: false }).where(eq(procedureTypes.id, id));
-  }
-
-  // Transaction type operations
-  async getTransactionTypes(): Promise<TransactionType[]> {
-    return await db.select().from(transactionTypes).where(eq(transactionTypes.isActive, true));
-  }
-
-  async getTransactionType(id: number): Promise<TransactionType | undefined> {
-    const [transactionType] = await db.select().from(transactionTypes).where(eq(transactionTypes.id, id));
-    return transactionType;
-  }
-
-  async createTransactionType(transactionType: InsertTransactionType): Promise<TransactionType> {
-    const [newTransactionType] = await db.insert(transactionTypes).values(transactionType).returning();
-    return newTransactionType;
-  }
-
-  async updateTransactionType(id: number, transactionType: Partial<InsertTransactionType>): Promise<TransactionType> {
-    const [updatedTransactionType] = await db
-      .update(transactionTypes)
-      .set(transactionType)
-      .where(eq(transactionTypes.id, id))
-      .returning();
-    return updatedTransactionType;
-  }
-
-  async deleteTransactionType(id: number): Promise<void> {
-    await db.update(transactionTypes).set({ isActive: false }).where(eq(transactionTypes.id, id));
-  }
-
-  // Appointment operations
-  async getAppointments(filters?: { date?: string; doctorId?: string; patientId?: number }): Promise<Appointment[]> {
-    let query = db.select().from(appointments);
-    
-    if (filters?.date) {
-      query = query.where(eq(appointments.date, filters.date));
+/**
+ * Implementação do storage usando MongoDB/Mongoose
+ */
+class MongoStorage implements IStorage {
+  
+  // ============================================================================
+  // OPERAÇÕES DE UTILIZADOR
+  // ============================================================================
+  
+  async getUsers(): Promise<IUser[]> {
+    try {
+      return await User.find({}).sort({ createdAt: -1 }).exec();
+    } catch (error) {
+      console.error('Erro ao buscar utilizadores:', error);
+      throw error;
     }
-    if (filters?.doctorId) {
-      query = query.where(eq(appointments.doctorId, filters.doctorId));
+  }
+
+  async getUser(id: string): Promise<IUser | null> {
+    try {
+      return await User.findById(id).exec();
+    } catch (error) {
+      console.error('Erro ao buscar utilizador:', error);
+      return null;
     }
-    if (filters?.patientId) {
-      query = query.where(eq(appointments.patientId, filters.patientId));
+  }
+  
+  async upsertUser(userData: Partial<IUser>): Promise<IUser> {
+    try {
+      const user = await User.findByIdAndUpdate(
+        userData._id,
+        { ...userData, updatedAt: new Date() },
+        { upsert: true, new: true, runValidators: true }
+      ).exec();
+      
+      if (!user) {
+        throw new Error('Falha ao criar/atualizar utilizador');
+      }
+      
+      return user;
+    } catch (error) {
+      console.error('Erro ao upsert utilizador:', error);
+      throw error;
     }
-    
-    return await query.orderBy(asc(appointments.date), asc(appointments.time));
+  }
+  
+  async updateUserType(userId: string, userType: string): Promise<IUser | null> {
+    try {
+      return await User.findByIdAndUpdate(
+        userId,
+        { userType, updatedAt: new Date() },
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar tipo de utilizador:', error);
+      return null;
+    }
   }
 
-  async getAppointment(id: number): Promise<Appointment | undefined> {
-    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
-    return appointment;
+  async updateUserStatus(userId: string, isActive: boolean): Promise<IUser | null> {
+    try {
+      return await User.findByIdAndUpdate(
+        userId,
+        { isActive, updatedAt: new Date() },
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar status do utilizador:', error);
+      return null;
+    }
   }
 
-  async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
-    const [newAppointment] = await db.insert(appointments).values(appointment).returning();
-    return newAppointment;
+  async updateDoctorSchedule(id: string, schedule: {
+    workingDays?: string[];
+    workingHours?: { start: string; end: string };
+    dailySchedules?: {
+      [key: string]: {
+        start: string;
+        end: string;
+        isActive: boolean;
+      };
+    };
+    consultationTypes?: string[];
+    procedureTypes?: string[];
+  }): Promise<IUser | null> {
+    try {
+      const updateData: any = { updatedAt: new Date() };
+      
+      if (schedule.workingDays !== undefined) {
+        updateData.workingDays = schedule.workingDays;
+      }
+      if (schedule.workingHours !== undefined) {
+        updateData.workingHours = schedule.workingHours;
+      }
+      if (schedule.dailySchedules !== undefined) {
+        updateData.dailySchedules = schedule.dailySchedules;
+      }
+      if (schedule.consultationTypes !== undefined) {
+        updateData.consultationTypes = schedule.consultationTypes;
+      }
+      if (schedule.procedureTypes !== undefined) {
+        updateData.procedureTypes = schedule.procedureTypes;
+      }
+
+      return await User.findOneAndUpdate(
+        { _id: id, userType: 'doctor' },
+        updateData,
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar horários do médico:', error);
+      return null;
+    }
   }
 
-  async updateAppointment(id: number, appointment: Partial<InsertAppointment>): Promise<Appointment> {
-    const [updatedAppointment] = await db
-      .update(appointments)
-      .set({ ...appointment, updatedAt: new Date() })
-      .where(eq(appointments.id, id))
-      .returning();
-    return updatedAppointment;
+  async updateDoctorSpecialties(id: string, specialties: string[]): Promise<IUser | null> {
+    try {
+      return await User.findOneAndUpdate(
+        { _id: id, userType: 'doctor' },
+        { specialties, updatedAt: new Date() },
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar especialidades do médico:', error);
+      return null;
+    }
   }
 
-  async deleteAppointment(id: number): Promise<void> {
-    await db.delete(appointments).where(eq(appointments.id, id));
+  // Métodos para autenticação tradicional
+  async getUserByEmail(email: string): Promise<IUser | null> {
+    try {
+      const user = await User.findOne({ email }).exec();
+      return user;
+    } catch (error) {
+      console.error('Erro ao buscar utilizador por email:', error);
+      throw error;
+    }
   }
 
+  async createUser(userData: Omit<IUser, '_id' | 'createdAt' | 'updatedAt'>): Promise<IUser> {
+    try {
+      const user = new User(userData);
+      return await user.save();
+    } catch (error) {
+      console.error('Erro ao criar utilizador:', error);
+      throw error;
+    }
+  }
+
+  async updateUserPassword(userId: string, hashedPassword: string): Promise<void> {
+    try {
+      await User.findByIdAndUpdate(
+        userId,
+        { 
+          password: hashedPassword, 
+          mustChangePassword: false,
+          updatedAt: new Date() 
+        }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar senha do utilizador:', error);
+      throw error;
+    }
+  }
+
+  async setPasswordResetToken(userId: string, token: string): Promise<void> {
+    try {
+      await User.findByIdAndUpdate(
+        userId,
+        { 
+          passwordResetToken: token,
+          updatedAt: new Date() 
+        }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao definir token de reset de senha:', error);
+      throw error;
+    }
+  }
+
+  async clearPasswordResetToken(userId: string): Promise<void> {
+    try {
+      await User.findByIdAndUpdate(
+        userId,
+        { 
+          $unset: { passwordResetToken: "" },
+          updatedAt: new Date()
+        }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao limpar token de reset de senha:', error);
+      throw error;
+    }
+  }
+
+  async updateUser(id: string, userData: Partial<IUser>): Promise<IUser | null> {
+    try {
+      return await User.findByIdAndUpdate(
+        id,
+        { ...userData, updatedAt: new Date() },
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar utilizador:', error);
+      return null;
+    }
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    try {
+      const result = await User.findByIdAndDelete(id).exec();
+      return result !== null;
+    } catch (error) {
+      console.error('Erro ao eliminar utilizador:', error);
+      return false;
+    }
+  }
+  
+  // ============================================================================
+  // OPERAÇÕES DE PACIENTE
+  // ============================================================================
+  
+  async getPatients(): Promise<IPatient[]> {
+    try {
+      return await Patient.find({ }).sort({ name: 1 }).exec();
+    } catch (error) {
+      console.error('Erro ao buscar pacientes:', error);
+      return [];
+    }
+  }
+  
+  async getPatient(id: string): Promise<IPatient | null> {
+    try {
+      return await Patient.findById(id).exec();
+    } catch (error) {
+      console.error('Erro ao buscar paciente:', error);
+      return null;
+    }
+  }
+  
+  async getPatientByDi(di: string): Promise<IPatient | null> {
+    try {
+      return await Patient.findOne({ di }).exec();
+    } catch (error) {
+      console.error('Erro ao buscar paciente por DI:', error);
+      return null;
+    }
+  }
+  
+  async createPatient(patientData: CreatePatient): Promise<IPatient> {
+    try {
+      // Verificar se DI já existe (apenas se foi fornecido)
+      if (patientData.di && patientData.di.trim()) {
+        const existingPatient = await Patient.findOne({ di: patientData.di.trim() }).exec();
+        if (existingPatient) {
+          throw new Error('Já existe um paciente com este Documento de Identidade');
+        }
+      }
+      
+      // Verificar se NIF já existe (apenas se foi fornecido)
+      if (patientData.nif && patientData.nif.trim()) {
+        const existingPatient = await Patient.findOne({ nif: patientData.nif.trim() }).exec();
+        if (existingPatient) {
+          throw new Error('Já existe um paciente com este NIF');
+        }
+      }
+      
+      const patient = new Patient(patientData);
+      return await patient.save();
+    } catch (error) {
+      console.error('Erro ao criar paciente:', error);
+      throw error;
+    }
+  }
+  
+  async updatePatient(id: string, patientData: Partial<CreatePatient>): Promise<IPatient | null> {
+    try {
+      // Verificar se DI já existe noutro paciente (apenas se foi fornecido)
+      if (patientData.di && patientData.di.trim()) {
+        const existingPatient = await Patient.findOne({ 
+          di: patientData.di.trim(),
+          _id: { $ne: id } // Excluir o próprio paciente da verificação
+        }).exec();
+        if (existingPatient) {
+          throw new Error('Já existe um paciente com este Documento de Identidade');
+        }
+      }
+      
+      // Verificar se NIF já existe noutro paciente (apenas se foi fornecido)
+      if (patientData.nif && patientData.nif.trim()) {
+        const existingPatient = await Patient.findOne({ 
+          nif: patientData.nif.trim(),
+          _id: { $ne: id } // Excluir o próprio paciente da verificação
+        }).exec();
+        if (existingPatient) {
+          throw new Error('Já existe um paciente com este NIF');
+        }
+      }
+      
+      return await Patient.findByIdAndUpdate(
+        id,
+        { ...patientData, updatedAt: new Date() },
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar paciente:', error);
+      throw error;
+    }
+  }
+
+  async deletePatient(id: string): Promise<boolean> {
+    try {
+      // Verificar se o paciente tem consultas ou procedimentos associados
+      const appointmentCount = await Appointment.countDocuments({ patientId: id }).exec();
+      const procedureCount = await Procedure.countDocuments({ patientId: id }).exec();
+      const transactionCount = await Transaction.countDocuments({ patientId: id }).exec();
+      
+      if (appointmentCount > 0 || procedureCount > 0 || transactionCount > 0) {
+        throw new Error('Não é possível eliminar o paciente pois tem consultas, procedimentos ou transações associadas');
+      }
+      
+      const result = await Patient.findByIdAndDelete(id).exec();
+      return !!result;
+    } catch (error) {
+      console.error('Erro ao eliminar paciente:', error);
+      throw error;
+    }
+  }
+  
+  async searchPatients(query: string): Promise<IPatient[]> {
+    try {
+      const searchRegex = new RegExp(query, 'i');
+      return await Patient.find({
+        $or: [
+          { name: searchRegex },
+          { di: searchRegex },
+          { email: searchRegex },
+          { phone: searchRegex }
+        ]
+      }).sort({ name: 1 }).exec();
+    } catch (error) {
+      console.error('Erro ao pesquisar pacientes:', error);
+      return [];
+    }
+  }
+  
+  // ============================================================================
+  // OPERAÇÕES DE TIPO DE CONSULTA
+  // ============================================================================
+  
+  async getConsultationTypes(): Promise<IConsultationType[]> {
+    try {
+      return await ConsultationType.find({ isActive: true }).sort({ name: 1 }).exec();
+    } catch (error) {
+      console.error('Erro ao buscar tipos de consulta:', error);
+      return [];
+    }
+  }
+  
+  async getConsultationType(id: string): Promise<IConsultationType | null> {
+    try {
+      return await ConsultationType.findById(id).exec();
+    } catch (error) {
+      console.error('Erro ao buscar tipo de consulta:', error);
+      return null;
+    }
+  }
+  
+  async createConsultationType(data: Partial<IConsultationType>): Promise<IConsultationType> {
+    try {
+      const consultationType = new ConsultationType(data);
+      return await consultationType.save();
+    } catch (error) {
+      console.error('Erro ao criar tipo de consulta:', error);
+      throw error;
+    }
+  }
+  
+  async updateConsultationType(id: string, data: Partial<IConsultationType>): Promise<IConsultationType | null> {
+    try {
+      return await ConsultationType.findByIdAndUpdate(
+        id,
+        data,
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar tipo de consulta:', error);
+      return null;
+    }
+  }
+  
+  async deleteConsultationType(id: string): Promise<void> {
+    try {
+      await ConsultationType.findByIdAndUpdate(
+        id,
+        { isActive: false },
+        { runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao desativar tipo de consulta:', error);
+      throw error;
+    }
+  }
+  
+  // ============================================================================
+  // OPERAÇÕES DE TIPO DE PROCEDIMENTO
+  // ============================================================================
+  
+  async getProcedureTypes(): Promise<IProcedureType[]> {
+    try {
+      return await ProcedureType.find({ isActive: true }).sort({ name: 1 }).exec();
+    } catch (error) {
+      console.error('Erro ao buscar tipos de procedimento:', error);
+      return [];
+    }
+  }
+  
+  async getProcedureType(id: string): Promise<IProcedureType | null> {
+    try {
+      return await ProcedureType.findById(id).exec();
+    } catch (error) {
+      console.error('Erro ao buscar tipo de procedimento:', error);
+      return null;
+    }
+  }
+  
+  async createProcedureType(data: Partial<IProcedureType>): Promise<IProcedureType> {
+    try {
+      const procedureType = new ProcedureType(data);
+      return await procedureType.save();
+    } catch (error) {
+      console.error('Erro ao criar tipo de procedimento:', error);
+      throw error;
+    }
+  }
+  
+  async updateProcedureType(id: string, data: Partial<IProcedureType>): Promise<IProcedureType | null> {
+    try {
+      return await ProcedureType.findByIdAndUpdate(
+        id,
+        data,
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar tipo de procedimento:', error);
+      return null;
+    }
+  }
+  
+  async deleteProcedureType(id: string): Promise<boolean> {
+    try {
+      const result = await ProcedureType.findByIdAndUpdate(
+        id,
+        { isActive: false },
+        { runValidators: true }
+      ).exec();
+      return result !== null;
+    } catch (error) {
+      console.error('Erro ao desativar tipo de procedimento:', error);
+      throw error;
+    }
+  }
+  
+  // ============================================================================
+  // OPERAÇÕES DE TIPO DE TRANSAÇÃO
+  // ============================================================================
+  
+  async getTransactionTypes(): Promise<ITransactionType[]> {
+    try {
+      return await TransactionType.find({ isActive: true }).sort({ name: 1 }).exec();
+    } catch (error) {
+      console.error('Erro ao buscar tipos de transação:', error);
+      return [];
+    }
+  }
+  
+  async getTransactionType(id: string): Promise<ITransactionType | null> {
+    try {
+      return await TransactionType.findById(id).exec();
+    } catch (error) {
+      console.error('Erro ao buscar tipo de transação:', error);
+      return null;
+    }
+  }
+  
+  async createTransactionType(data: Partial<ITransactionType>): Promise<ITransactionType> {
+    try {
+      const transactionType = new TransactionType(data);
+      return await transactionType.save();
+    } catch (error) {
+      console.error('Erro ao criar tipo de transação:', error);
+      throw error;
+    }
+  }
+  
+  async updateTransactionType(id: string, data: Partial<ITransactionType>): Promise<ITransactionType | null> {
+    try {
+      return await TransactionType.findByIdAndUpdate(
+        id,
+        data,
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar tipo de transação:', error);
+      return null;
+    }
+  }
+  
+  async deleteTransactionType(id: string): Promise<void> {
+    try {
+      await TransactionType.findByIdAndUpdate(
+        id,
+        { isActive: false },
+        { runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao desativar tipo de transação:', error);
+      throw error;
+    }
+  }
+  
+  // ============================================================================
+  // OPERAÇÕES DE CONSULTA
+  // ============================================================================
+  
+  async getAppointments(filters?: { date?: string; doctorId?: string; patientId?: string }): Promise<IAppointment[]> {
+    try {
+      const query: any = {};
+      
+      if (filters?.date) {
+        query.date = new Date(filters.date);
+      }
+      if (filters?.doctorId) {
+        query.doctorId = new Types.ObjectId(filters.doctorId);
+      }
+      if (filters?.patientId) {
+        query.patientId = new Types.ObjectId(filters.patientId);
+      }
+      
+      return await Appointment.find(query)
+        .populate('patientId', 'name di phone')
+        .populate('doctorId', 'firstName lastName')
+        .populate('consultationTypeId', 'name price')
+        .sort({ date: -1, time: 1 })
+        .exec();
+    } catch (error) {
+      console.error('Erro ao buscar consultas:', error);
+      return [];
+    }
+  }
+  
+  async getAppointment(id: string): Promise<IAppointment | null> {
+    try {
+      return await Appointment.findById(id)
+        .populate('patientId')
+        .populate('doctorId')
+        .populate('consultationTypeId')
+        .exec();
+    } catch (error) {
+      console.error('Erro ao buscar consulta:', error);
+      return null;
+    }
+  }
+  
+  async createAppointment(appointmentData: CreateAppointment): Promise<IAppointment> {
+    try {
+      const appointment = new Appointment({
+        ...appointmentData,
+        patientId: new Types.ObjectId(appointmentData.patientId),
+        doctorId: new Types.ObjectId(appointmentData.doctorId),
+        consultationTypeId: new Types.ObjectId(appointmentData.consultationTypeId),
+        date: new Date(appointmentData.date)
+      });
+      return await appointment.save();
+    } catch (error) {
+      console.error('Erro ao criar consulta:', error);
+      throw error;
+    }
+  }
+  
+  async updateAppointment(id: string, appointmentData: Partial<CreateAppointment>): Promise<IAppointment | null> {
+    try {
+      console.log(`[DEBUG] Storage updateAppointment - ID: ${id}, Data:`, appointmentData);
+      
+      const updateData: any = { ...appointmentData, updatedAt: new Date() };
+      
+      if (appointmentData.patientId) {
+        updateData.patientId = new Types.ObjectId(appointmentData.patientId);
+      }
+      if (appointmentData.doctorId) {
+        updateData.doctorId = new Types.ObjectId(appointmentData.doctorId);
+      }
+      if (appointmentData.consultationTypeId) {
+        updateData.consultationTypeId = new Types.ObjectId(appointmentData.consultationTypeId);
+      }
+      if (appointmentData.date) {
+        updateData.date = new Date(appointmentData.date);
+      }
+      if (appointmentData.status) {
+        updateData.status = appointmentData.status;
+      }
+      
+      console.log(`[DEBUG] Final update data:`, updateData);
+      
+      const result = await Appointment.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true, runValidators: true }
+      ).exec();
+      
+      console.log(`[DEBUG] MongoDB update result:`, result);
+      return result;
+    } catch (error) {
+      console.error('Erro ao atualizar consulta:', error);
+      return null;
+    }
+  }
+  
+  async deleteAppointment(id: string): Promise<void> {
+    try {
+      await Appointment.findByIdAndDelete(id).exec();
+    } catch (error) {
+      console.error('Erro ao eliminar consulta:', error);
+      throw error;
+    }
+  }
+  
   async getDoctorAvailability(doctorId: string, date: string): Promise<string[]> {
-    const existingAppointments = await db
-      .select({ time: appointments.time })
-      .from(appointments)
-      .where(and(eq(appointments.doctorId, doctorId), eq(appointments.date, date)));
-    
-    const bookedTimes = existingAppointments.map(apt => apt.time);
-    
-    // Generate available time slots (8 AM to 6 PM, 30-minute intervals)
-    const allTimes = [];
-    for (let hour = 8; hour < 18; hour++) {
-      allTimes.push(`${hour.toString().padStart(2, '0')}:00:00`);
-      allTimes.push(`${hour.toString().padStart(2, '0')}:30:00`);
+    try {
+      console.log(`[DEBUG] getDoctorAvailability called with doctorId: ${doctorId}, date: ${date}`);
+      
+      // Buscar agendamentos ocupados
+      const appointments = await Appointment.find({
+        doctorId: new Types.ObjectId(doctorId),
+        date: new Date(date),
+        status: { $ne: 'cancelled' }
+      }).select('time').exec();
+      
+      const occupiedTimes = appointments.map(apt => apt.time);
+      console.log(`[DEBUG] Occupied times:`, occupiedTimes);
+      
+      // Buscar informações do médico para obter horário de trabalho
+      const doctor = await User.findById(doctorId).exec();
+      if (!doctor) {
+        console.log(`[DEBUG] Doctor not found with ID: ${doctorId}`);
+        return [];
+      }
+      
+      console.log(`[DEBUG] Doctor found:`, {
+        name: `${doctor.firstName} ${doctor.lastName}`,
+        workingDays: doctor.workingDays,
+        workingHours: doctor.workingHours,
+        dailySchedules: doctor.dailySchedules
+      });
+      
+      // Obter dia da semana
+      const selectedDateObj = new Date(date);
+      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayName = dayNames[selectedDateObj.getDay()];
+      console.log(`[DEBUG] Day of week: ${dayName} (${selectedDateObj.getDay()})`);
+      
+      // Verificar se o médico trabalha neste dia
+      if (doctor.workingDays && doctor.workingDays.length > 0 && !doctor.workingDays.includes(dayName)) {
+        console.log(`[DEBUG] Doctor does not work on ${dayName}`);
+        return [];
+      }
+      
+      // Obter horário de trabalho para o dia específico ou horário padrão
+      let workingHours = doctor.workingHours || { start: '09:00', end: '17:00' };
+      if (doctor.dailySchedules && doctor.dailySchedules[dayName] && doctor.dailySchedules[dayName].isActive) {
+        workingHours = {
+          start: doctor.dailySchedules[dayName].start,
+          end: doctor.dailySchedules[dayName].end
+        };
+      }
+      console.log(`[DEBUG] Working hours for ${dayName}:`, workingHours);
+      
+      // Gerar todos os horários possíveis (slots de 30 minutos)
+      const availableTimes = [];
+      const startTime = new Date(`2000-01-01T${workingHours.start}:00`);
+      const endTime = new Date(`2000-01-01T${workingHours.end}:00`);
+      
+      let currentTime = new Date(startTime);
+      while (currentTime < endTime) {
+        const timeString = currentTime.toTimeString().substring(0, 5);
+        
+        // Adicionar apenas se não estiver ocupado
+        if (!occupiedTimes.includes(timeString)) {
+          availableTimes.push(timeString);
+        }
+        
+        // Adicionar 30 minutos
+        currentTime.setMinutes(currentTime.getMinutes() + 30);
+      }
+      
+      console.log(`[DEBUG] Available times generated:`, availableTimes);
+      return availableTimes;
+    } catch (error) {
+      console.error('Erro ao verificar disponibilidade do médico:', error);
+      return [];
     }
-    
-    return allTimes.filter(time => !bookedTimes.includes(time));
   }
-
-  // Procedure operations
-  async getProcedures(filters?: { patientId?: number; doctorId?: string; appointmentId?: number }): Promise<Procedure[]> {
-    let query = db.select().from(procedures);
-    
-    if (filters?.patientId) {
-      query = query.where(eq(procedures.patientId, filters.patientId));
+  
+  // ============================================================================
+  // OPERAÇÕES DE PROCEDIMENTO
+  // ============================================================================
+  
+  async getProcedures(filters?: { patientId?: string; doctorId?: string; appointmentId?: string }): Promise<IProcedure[]> {
+    try {
+      const query: any = {};
+      
+      if (filters?.patientId) {
+        query.patientId = new Types.ObjectId(filters.patientId);
+      }
+      if (filters?.doctorId) {
+        query.doctorId = new Types.ObjectId(filters.doctorId);
+      }
+      if (filters?.appointmentId) {
+        query.appointmentId = new Types.ObjectId(filters.appointmentId);
+      }
+      
+      return await Procedure.find(query)
+        .populate('patientId', 'name di')
+        .populate('doctorId', 'firstName lastName')
+        .populate('procedureTypeId', 'name price category')
+        .populate('appointmentId')
+        .sort({ date: -1 })
+        .exec();
+    } catch (error) {
+      console.error('Erro ao buscar procedimentos:', error);
+      return [];
     }
-    if (filters?.doctorId) {
-      query = query.where(eq(procedures.doctorId, filters.doctorId));
+  }
+  
+  async getProcedure(id: string): Promise<IProcedure | null> {
+    try {
+      return await Procedure.findById(id)
+        .populate('patientId')
+        .populate('doctorId')
+        .populate('procedureTypeId')
+        .populate('appointmentId')
+        .exec();
+    } catch (error) {
+      console.error('Erro ao buscar procedimento:', error);
+      return null;
     }
-    if (filters?.appointmentId) {
-      query = query.where(eq(procedures.appointmentId, filters.appointmentId));
+  }
+  
+  async createProcedure(procedureData: CreateProcedure): Promise<IProcedure> {
+    try {
+      const procedure = new Procedure({
+        ...procedureData,
+        patientId: new Types.ObjectId(procedureData.patientId),
+        doctorId: new Types.ObjectId(procedureData.doctorId),
+        procedureTypeId: new Types.ObjectId(procedureData.procedureTypeId),
+        appointmentId: procedureData.appointmentId ? new Types.ObjectId(procedureData.appointmentId) : undefined,
+        date: new Date(procedureData.date)
+      });
+      return await procedure.save();
+    } catch (error) {
+      console.error('Erro ao criar procedimento:', error);
+      throw error;
     }
-    
-    return await query.orderBy(desc(procedures.date));
   }
-
-  async getProcedure(id: number): Promise<Procedure | undefined> {
-    const [procedure] = await db.select().from(procedures).where(eq(procedures.id, id));
-    return procedure;
-  }
-
-  async createProcedure(procedure: InsertProcedure): Promise<Procedure> {
-    const [newProcedure] = await db.insert(procedures).values(procedure).returning();
-    return newProcedure;
-  }
-
-  async updateProcedure(id: number, procedure: Partial<InsertProcedure>): Promise<Procedure> {
-    const [updatedProcedure] = await db
-      .update(procedures)
-      .set(procedure)
-      .where(eq(procedures.id, id))
-      .returning();
-    return updatedProcedure;
-  }
-
-  // Transaction operations
-  async getTransactions(filters?: { patientId?: number; status?: string; dateFrom?: string; dateTo?: string }): Promise<Transaction[]> {
-    let query = db.select().from(transactions);
-    
-    if (filters?.patientId) {
-      query = query.where(eq(transactions.patientId, filters.patientId));
+  
+  async updateProcedure(id: string, procedureData: Partial<CreateProcedure>): Promise<IProcedure | null> {
+    try {
+      const updateData: any = { ...procedureData };
+      
+      if (procedureData.patientId) {
+        updateData.patientId = new Types.ObjectId(procedureData.patientId);
+      }
+      if (procedureData.doctorId) {
+        updateData.doctorId = new Types.ObjectId(procedureData.doctorId);
+      }
+      if (procedureData.procedureTypeId) {
+        updateData.procedureTypeId = new Types.ObjectId(procedureData.procedureTypeId);
+      }
+      if (procedureData.appointmentId) {
+        updateData.appointmentId = new Types.ObjectId(procedureData.appointmentId);
+      }
+      if (procedureData.date) {
+        updateData.date = new Date(procedureData.date);
+      }
+      
+      return await Procedure.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar procedimento:', error);
+      return null;
     }
-    if (filters?.status) {
-      query = query.where(eq(transactions.status, filters.status));
+  }
+  
+  // ============================================================================
+  // OPERAÇÕES DE TRANSAÇÃO
+  // ============================================================================
+  
+  async getTransactions(filters?: { patientId?: string; status?: string; dateFrom?: string; dateTo?: string }): Promise<ITransaction[]> {
+    try {
+      const query: any = {};
+      
+      if (filters?.patientId) {
+        query.patientId = new Types.ObjectId(filters.patientId);
+      }
+      if (filters?.status) {
+        query.status = filters.status;
+      }
+      if (filters?.dateFrom || filters?.dateTo) {
+        query.transactionDate = {};
+        if (filters.dateFrom) {
+          query.transactionDate.$gte = new Date(filters.dateFrom);
+        }
+        if (filters.dateTo) {
+          query.transactionDate.$lte = new Date(filters.dateTo);
+        }
+      }
+      
+      return await Transaction.find(query)
+        .populate('patientId', 'name di')
+        .populate('transactionTypeId', 'name category')
+        .populate('appointmentId')
+        .populate('procedureId')
+        .sort({ transactionDate: -1 })
+        .exec();
+    } catch (error) {
+      console.error('Erro ao buscar transações:', error);
+      return [];
     }
-    if (filters?.dateFrom) {
-      query = query.where(gte(transactions.transactionDate, new Date(filters.dateFrom)));
+  }
+  
+  async getTransaction(id: string): Promise<ITransaction | null> {
+    try {
+      return await Transaction.findById(id)
+        .populate('patientId')
+        .populate('transactionTypeId')
+        .populate('appointmentId')
+        .populate('procedureId')
+        .exec();
+    } catch (error) {
+      console.error('Erro ao buscar transação:', error);
+      return null;
     }
-    if (filters?.dateTo) {
-      query = query.where(lte(transactions.transactionDate, new Date(filters.dateTo)));
+  }
+  
+  async createTransaction(transactionData: CreateTransaction): Promise<ITransaction> {
+    try {
+      const transaction = new Transaction({
+        ...transactionData,
+        patientId: transactionData.patientId ? new Types.ObjectId(transactionData.patientId) : undefined,
+        appointmentId: transactionData.appointmentId ? new Types.ObjectId(transactionData.appointmentId) : undefined,
+        procedureId: transactionData.procedureId ? new Types.ObjectId(transactionData.procedureId) : undefined,
+        transactionTypeId: new Types.ObjectId(transactionData.transactionTypeId),
+        dueDate: transactionData.dueDate ? new Date(transactionData.dueDate) : undefined
+      });
+      return await transaction.save();
+    } catch (error) {
+      console.error('Erro ao criar transação:', error);
+      throw error;
     }
-    
-    return await query.orderBy(desc(transactions.transactionDate));
+  }
+  
+  async updateTransaction(id: string, transactionData: Partial<CreateTransaction>): Promise<ITransaction | null> {
+    try {
+      const updateData: any = { ...transactionData };
+      
+      if (transactionData.patientId) {
+        updateData.patientId = new Types.ObjectId(transactionData.patientId);
+      }
+      if (transactionData.appointmentId) {
+        updateData.appointmentId = new Types.ObjectId(transactionData.appointmentId);
+      }
+      if (transactionData.procedureId) {
+        updateData.procedureId = new Types.ObjectId(transactionData.procedureId);
+      }
+      if (transactionData.transactionTypeId) {
+        updateData.transactionTypeId = new Types.ObjectId(transactionData.transactionTypeId);
+      }
+      if (transactionData.dueDate) {
+        updateData.dueDate = new Date(transactionData.dueDate);
+      }
+      
+      return await Transaction.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar transação:', error);
+      return null;
+    }
   }
 
-  async getTransaction(id: number): Promise<Transaction | undefined> {
-    const [transaction] = await db.select().from(transactions).where(eq(transactions.id, id));
-    return transaction;
+  async deleteTransaction(id: string): Promise<boolean> {
+    try {
+      const result = await Transaction.findByIdAndDelete(id).exec();
+      return result !== null;
+    } catch (error) {
+      console.error('Erro ao eliminar transação:', error);
+      return false;
+    }
   }
-
-  async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    const [newTransaction] = await db.insert(transactions).values(transaction).returning();
-    return newTransaction;
+  
+  // ============================================================================
+  // OPERAÇÕES DE CONFIGURAÇÃO DE TIPO DE UTILIZADOR
+  // ============================================================================
+  
+  async getUserTypeConfigs(): Promise<IUserTypeConfig[]> {
+    try {
+      return await UserTypeConfig.find({ isActive: true }).sort({ name: 1 }).exec();
+    } catch (error) {
+      console.error('Erro ao buscar configurações de tipo de utilizador:', error);
+      return [];
+    }
   }
-
-  async updateTransaction(id: number, transaction: Partial<InsertTransaction>): Promise<Transaction> {
-    const [updatedTransaction] = await db
-      .update(transactions)
-      .set(transaction)
-      .where(eq(transactions.id, id))
-      .returning();
-    return updatedTransaction;
+  
+  async getUserTypeConfig(id: string): Promise<IUserTypeConfig | null> {
+    try {
+      return await UserTypeConfig.findById(id).exec();
+    } catch (error) {
+      console.error('Erro ao buscar configuração de tipo de utilizador:', error);
+      return null;
+    }
   }
-
-  // User type config operations
-  async getUserTypeConfigs(): Promise<UserTypeConfig[]> {
-    return await db.select().from(userTypeConfigs).where(eq(userTypeConfigs.isActive, true));
+  
+  async createUserTypeConfig(data: Partial<IUserTypeConfig>): Promise<IUserTypeConfig> {
+    try {
+      const config = new UserTypeConfig(data);
+      return await config.save();
+    } catch (error) {
+      console.error('Erro ao criar configuração de tipo de utilizador:', error);
+      throw error;
+    }
   }
-
-  async getUserTypeConfig(id: number): Promise<UserTypeConfig | undefined> {
-    const [config] = await db.select().from(userTypeConfigs).where(eq(userTypeConfigs.id, id));
-    return config;
+  
+  async updateUserTypeConfig(id: string, data: Partial<IUserTypeConfig>): Promise<IUserTypeConfig | null> {
+    try {
+      return await UserTypeConfig.findByIdAndUpdate(
+        id,
+        data,
+        { new: true, runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao atualizar configuração de tipo de utilizador:', error);
+      return null;
+    }
   }
-
-  async createUserTypeConfig(config: InsertUserTypeConfig): Promise<UserTypeConfig> {
-    const [newConfig] = await db.insert(userTypeConfigs).values(config).returning();
-    return newConfig;
+  
+  async deleteUserTypeConfig(id: string): Promise<void> {
+    try {
+      await UserTypeConfig.findByIdAndUpdate(
+        id,
+        { isActive: false },
+        { runValidators: true }
+      ).exec();
+    } catch (error) {
+      console.error('Erro ao desativar configuração de tipo de utilizador:', error);
+      throw error;
+    }
   }
-
-  async updateUserTypeConfig(id: number, config: Partial<InsertUserTypeConfig>): Promise<UserTypeConfig> {
-    const [updatedConfig] = await db
-      .update(userTypeConfigs)
-      .set(config)
-      .where(eq(userTypeConfigs.id, id))
-      .returning();
-    return updatedConfig;
-  }
-
-  async deleteUserTypeConfig(id: number): Promise<void> {
-    await db.update(userTypeConfigs).set({ isActive: false }).where(eq(userTypeConfigs.id, id));
-  }
-
-  // Dashboard metrics
+  
+  // ============================================================================
+  // MÉTRICAS DO DASHBOARD
+  // ============================================================================
+  
   async getDashboardMetrics(): Promise<{
     todayAppointments: number;
     pendingPayments: number;
     monthlyRevenue: number;
     activePatients: number;
+    recentAppointments: IAppointment[];
+    recentTransactions: ITransaction[];
   }> {
-    const today = new Date().toISOString().split('T')[0];
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-
-    // Today's appointments
-    const todayAppointments = await db
-      .select({ count: appointments.id })
-      .from(appointments)
-      .where(eq(appointments.date, today));
-
-    // Pending payments
-    const pendingTransactions = await db
-      .select({ amount: transactions.amount })
-      .from(transactions)
-      .where(eq(transactions.status, 'pending'));
-
-    const pendingPayments = pendingTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-
-    // Monthly revenue
-    const monthlyTransactions = await db
-      .select({ amount: transactions.amount })
-      .from(transactions)
-      .where(and(
-        eq(transactions.status, 'paid'),
-        gte(transactions.transactionDate, monthStart)
-      ));
-
-    const monthlyRevenue = monthlyTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
-
-    // Active patients (patients with appointments in the last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const activePatientIds = await db
-      .selectDistinct({ patientId: appointments.patientId })
-      .from(appointments)
-      .where(gte(appointments.date, sixMonthsAgo.toISOString().split('T')[0]));
-
-    return {
-      todayAppointments: todayAppointments.length,
-      pendingPayments,
-      monthlyRevenue,
-      activePatients: activePatientIds.length,
-    };
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      
+      // Consultas de hoje
+      const todayAppointments = await Appointment.countDocuments({
+        date: today,
+        status: { $ne: 'cancelled' }
+      });
+      
+      // Pagamentos pendentes
+      const pendingPayments = await Transaction.countDocuments({
+        status: 'pending'
+      });
+      
+      // Receita mensal
+      const monthlyRevenueResult = await Transaction.aggregate([
+        {
+          $match: {
+            transactionDate: { $gte: startOfMonth, $lte: endOfMonth },
+            status: 'paid'
+          }
+        },
+        {
+          $lookup: {
+            from: 'transactiontypes',
+            localField: 'transactionTypeId',
+            foreignField: '_id',
+            as: 'transactionType'
+          }
+        },
+        {
+          $match: {
+            'transactionType.category': 'income'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' }
+          }
+        }
+      ]);
+      
+      const monthlyRevenue = monthlyRevenueResult[0]?.total || 0;
+      
+      // Pacientes ativos (com consultas nos últimos 6 meses)
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      const activePatientIds = await Appointment.distinct('patientId', {
+        date: { $gte: sixMonthsAgo }
+      });
+      
+      const activePatients = activePatientIds.length;
+      
+      // Consultas recentes
+      const recentAppointments = await Appointment.find({})
+        .populate('patientId', 'name')
+        .populate('doctorId', 'firstName lastName')
+        .populate('consultationTypeId', 'name')
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .exec();
+      
+      // Transações recentes
+      const recentTransactions = await Transaction.find({})
+        .populate('patientId', 'name')
+        .populate('transactionTypeId', 'name category')
+        .sort({ transactionDate: -1 })
+        .limit(5)
+        .exec();
+      
+      return {
+        todayAppointments,
+        pendingPayments,
+        monthlyRevenue,
+        activePatients,
+        recentAppointments,
+        recentTransactions
+      };
+    } catch (error) {
+      console.error('Erro ao buscar métricas do dashboard:', error);
+      return {
+        todayAppointments: 0,
+        pendingPayments: 0,
+        monthlyRevenue: 0,
+        activePatients: 0,
+        recentAppointments: [],
+        recentTransactions: []
+      };
+    }
+  }
+  
+  // ============================================================================
+  // RELATÓRIOS FINANCEIROS
+  // ============================================================================
+  
+  async getFinancialReport(dateFrom: string, dateTo: string): Promise<{
+    totalRevenue: number;
+    totalExpenses: number;
+    netProfit: number;
+    transactionsByType: Array<{ type: string; amount: number; count: number }>;
+    dailyRevenue: Array<{ date: string; amount: number }>;
+  }> {
+    try {
+      const startDate = new Date(dateFrom);
+      const endDate = new Date(dateTo);
+      
+      // Receitas e despesas totais
+      const financialSummary = await Transaction.aggregate([
+        {
+          $match: {
+            transactionDate: { $gte: startDate, $lte: endDate },
+            status: 'paid'
+          }
+        },
+        {
+          $lookup: {
+            from: 'transactiontypes',
+            localField: 'transactionTypeId',
+            foreignField: '_id',
+            as: 'transactionType'
+          }
+        },
+        {
+          $unwind: '$transactionType'
+        },
+        {
+          $group: {
+            _id: '$transactionType.category',
+            total: { $sum: '$amount' }
+          }
+        }
+      ]);
+      
+      const totalRevenue = financialSummary.find(item => item._id === 'income')?.total || 0;
+      const totalExpenses = financialSummary.find(item => item._id === 'expense')?.total || 0;
+      const netProfit = totalRevenue - totalExpenses;
+      
+      // Transações por tipo
+      const transactionsByType = await Transaction.aggregate([
+        {
+          $match: {
+            transactionDate: { $gte: startDate, $lte: endDate },
+            status: 'paid'
+          }
+        },
+        {
+          $lookup: {
+            from: 'transactiontypes',
+            localField: 'transactionTypeId',
+            foreignField: '_id',
+            as: 'transactionType'
+          }
+        },
+        {
+          $unwind: '$transactionType'
+        },
+        {
+          $group: {
+            _id: '$transactionType.name',
+            amount: { $sum: '$amount' },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $project: {
+            type: '$_id',
+            amount: 1,
+            count: 1,
+            _id: 0
+          }
+        },
+        {
+          $sort: { amount: -1 }
+        }
+      ]);
+      
+      // Receita diária
+      const dailyRevenue = await Transaction.aggregate([
+        {
+          $match: {
+            transactionDate: { $gte: startDate, $lte: endDate },
+            status: 'paid'
+          }
+        },
+        {
+          $lookup: {
+            from: 'transactiontypes',
+            localField: 'transactionTypeId',
+            foreignField: '_id',
+            as: 'transactionType'
+          }
+        },
+        {
+          $match: {
+            'transactionType.category': 'income'
+          }
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: '%Y-%m-%d',
+                date: '$transactionDate'
+              }
+            },
+            amount: { $sum: '$amount' }
+          }
+        },
+        {
+          $project: {
+            date: '$_id',
+            amount: 1,
+            _id: 0
+          }
+        },
+        {
+          $sort: { date: 1 }
+        }
+      ]);
+      
+      return {
+        totalRevenue,
+        totalExpenses,
+        netProfit,
+        transactionsByType,
+        dailyRevenue
+      };
+    } catch (error) {
+      console.error('Erro ao gerar relatório financeiro:', error);
+      return {
+        totalRevenue: 0,
+        totalExpenses: 0,
+        netProfit: 0,
+        transactionsByType: [],
+        dailyRevenue: []
+      };
+    }
   }
 }
 
-export const storage = new DatabaseStorage();
+// Exportar instância singleton do storage
+export const storage = new MongoStorage();
+export default storage;

@@ -11,10 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
 const patientSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  cpf: z.string().min(11, "CPF must be at least 11 characters").max(14, "CPF must be at most 14 characters"),
+  name: z.string().min(1, "Nome é obrigatório"),
+  di: z.string().optional(), // Documento de Identidade
+  nif: z.string().optional(), // Número de Identificação Fiscal
   phone: z.string().optional(),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  email: z.string().email("Endereço de email inválido").optional().or(z.literal("")),
   address: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -25,16 +26,18 @@ interface PatientFormProps {
   onSuccess?: () => void;
   initialData?: Partial<PatientFormData>;
   isEditing?: boolean;
+  patientId?: string;
 }
 
-export function PatientForm({ onSuccess, initialData, isEditing = false }: PatientFormProps) {
+export function PatientForm({ onSuccess, initialData, isEditing = false, patientId }: PatientFormProps) {
   const { toast } = useToast();
 
   const form = useForm<PatientFormData>({
     resolver: zodResolver(patientSchema),
     defaultValues: {
       name: initialData?.name || "",
-      cpf: initialData?.cpf || "",
+      di: initialData?.di || "",
+      nif: initialData?.nif || "",
       phone: initialData?.phone || "",
       email: initialData?.email || "",
       address: initialData?.address || "",
@@ -44,20 +47,62 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
 
   const createPatientMutation = useMutation({
     mutationFn: async (data: PatientFormData) => {
-      await apiRequest("POST", "/api/patients", data);
+      // Converter strings vazias em undefined para campos opcionais
+      const cleanedData = {
+        ...data,
+        di: data.di?.trim() || undefined,
+        nif: data.nif?.trim() || undefined,
+        phone: data.phone?.trim() || undefined,
+        email: data.email?.trim() || undefined,
+        address: data.address?.trim() || undefined,
+        notes: data.notes?.trim() || undefined,
+      };
+      await apiRequest("POST", "/api/patients", cleanedData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
       toast({
-        title: "Success",
-        description: "Patient created successfully",
+        title: "Sucesso",
+        description: "Paciente criado com sucesso",
       });
       form.reset();
       onSuccess?.();
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePatientMutation = useMutation({
+    mutationFn: async (data: PatientFormData) => {
+      if (!patientId) throw new Error("ID do paciente é obrigatório para edição");
+      // Converter strings vazias em undefined para campos opcionais
+      const cleanedData = {
+        ...data,
+        di: data.di?.trim() || undefined,
+        nif: data.nif?.trim() || undefined,
+        phone: data.phone?.trim() || undefined,
+        email: data.email?.trim() || undefined,
+        address: data.address?.trim() || undefined,
+        notes: data.notes?.trim() || undefined,
+      };
+      await apiRequest("PUT", `/api/patients/${patientId}`, cleanedData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+      toast({
+        title: "Sucesso",
+        description: "Paciente atualizado com sucesso",
+      });
+      onSuccess?.();
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro",
         description: error.message,
         variant: "destructive",
       });
@@ -68,13 +113,18 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
     // Clean up empty strings
     const cleanedData = {
       ...data,
+      di: data.di || undefined,
       phone: data.phone || undefined,
       email: data.email || undefined,
       address: data.address || undefined,
       notes: data.notes || undefined,
     };
     
-    createPatientMutation.mutate(cleanedData);
+    if (isEditing) {
+      updatePatientMutation.mutate(cleanedData);
+    } else {
+      createPatientMutation.mutate(cleanedData);
+    }
   };
 
   return (
@@ -86,9 +136,9 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Full Name *</FormLabel>
+                <FormLabel>Nome Completo *</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter patient's full name" {...field} />
+                  <Input placeholder="Digite o nome completo do paciente" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -97,12 +147,26 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
 
           <FormField
             control={form.control}
-            name="cpf"
+            name="di"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>CPF/ID *</FormLabel>
+                <FormLabel>DI - Documento de Identidade</FormLabel>
                 <FormControl>
-                  <Input placeholder="000.000.000-00" {...field} />
+                  <Input placeholder="Número do documento de identidade" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="nif"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>NIF - Número de Identificação Fiscal</FormLabel>
+                <FormControl>
+                  <Input placeholder="Número de identificação fiscal" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -116,7 +180,7 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone Number</FormLabel>
+                <FormLabel>Número de Telefone</FormLabel>
                 <FormControl>
                   <Input placeholder="(11) 99999-9999" {...field} />
                 </FormControl>
@@ -130,7 +194,7 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
             name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email Address</FormLabel>
+                <FormLabel>Endereço de Email</FormLabel>
                 <FormControl>
                   <Input 
                     type="email" 
@@ -149,9 +213,9 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
           name="address"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Address</FormLabel>
+              <FormLabel>Endereço</FormLabel>
               <FormControl>
-                <Input placeholder="Street, City, State, ZIP" {...field} />
+                <Input placeholder="Rua, Cidade, Estado, CEP" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -163,10 +227,10 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
           name="notes"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Medical Notes</FormLabel>
+              <FormLabel>Notas Médicas</FormLabel>
               <FormControl>
                 <Textarea 
-                  placeholder="Any medical considerations, allergies, or special notes..."
+                  placeholder="Considerações médicas, alergias ou notas especiais..."
                   className="min-h-[100px]"
                   {...field} 
                 />
@@ -178,13 +242,13 @@ export function PatientForm({ onSuccess, initialData, isEditing = false }: Patie
 
         <div className="flex justify-end space-x-3">
           <Button type="button" variant="outline" onClick={() => form.reset()}>
-            Cancel
+            Cancelar
           </Button>
-          <Button type="submit" disabled={createPatientMutation.isPending}>
-            {createPatientMutation.isPending && (
+          <Button type="submit" disabled={createPatientMutation.isPending || updatePatientMutation.isPending}>
+            {(createPatientMutation.isPending || updatePatientMutation.isPending) && (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             )}
-            {isEditing ? "Update Patient" : "Add Patient"}
+            {isEditing ? "Atualizar Paciente" : "Adicionar Paciente"}
           </Button>
         </div>
       </form>

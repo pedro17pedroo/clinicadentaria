@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { UserPlus, ClipboardList, CreditCard, BarChart3, ChevronRight } from "lucide-react";
 import { PatientForm } from "@/components/forms/patient-form";
 import { ProcedureForm } from "@/components/forms/procedure-form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Link } from "wouter";
 
 export function QuickActions() {
@@ -13,7 +13,7 @@ export function QuickActions() {
   const quickActions = [
     {
       id: "new-patient",
-      title: "Add New Patient",
+      title: "Adicionar Novo Paciente",
       icon: UserPlus,
       color: "text-primary",
       bgColor: "bg-primary/10",
@@ -22,7 +22,7 @@ export function QuickActions() {
     },
     {
       id: "record-procedure",
-      title: "Record Procedure",
+      title: "Registar Procedimento",
       icon: ClipboardList,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-100 dark:bg-green-900/30",
@@ -31,7 +31,7 @@ export function QuickActions() {
     },
     {
       id: "process-payment",
-      title: "Process Payment",
+      title: "Processar Pagamento",
       icon: CreditCard,
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-100 dark:bg-purple-900/30",
@@ -40,7 +40,7 @@ export function QuickActions() {
     },
     {
       id: "generate-report",
-      title: "Generate Report",
+      title: "Gerar Relatório",
       icon: BarChart3,
       color: "text-orange-600 dark:text-orange-400",
       bgColor: "bg-orange-100 dark:bg-orange-900/30",
@@ -52,20 +52,20 @@ export function QuickActions() {
   const recentActivities = [
     {
       type: "payment",
-      message: "Payment received from John Smith",
-      time: "2 min ago",
+      message: "Pagamento recebido de John Smith",
+      time: "há 2 min",
       color: "bg-green-500",
     },
     {
       type: "appointment",
-      message: "New appointment scheduled for Lisa Brown",
-      time: "15 min ago",
+      message: "Nova consulta agendada para Lisa Brown",
+      time: "há 15 min",
       color: "bg-primary",
     },
     {
       type: "procedure",
-      message: "Procedure completed for Mike Davis",
-      time: "1 hour ago",
+      message: "Procedimento concluído para Mike Davis",
+      time: "há 1 hora",
       color: "bg-purple-500",
     },
   ];
@@ -75,7 +75,7 @@ export function QuickActions() {
       {/* Quick Actions */}
       <Card>
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle>Ações Rápidas</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {quickActions.map((action) => {
@@ -116,7 +116,7 @@ export function QuickActions() {
       {/* Recent Activity */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
+          <CardTitle>Atividade Recente</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {recentActivities.map((activity, index) => (
@@ -141,7 +141,10 @@ export function QuickActions() {
       <Dialog open={activeDialog === "patient"} onOpenChange={() => setActiveDialog(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add New Patient</DialogTitle>
+            <DialogTitle>Adicionar Novo Paciente</DialogTitle>
+            <DialogDescription>
+              Adicione um novo paciente ao sistema preenchendo as informações necessárias.
+            </DialogDescription>
           </DialogHeader>
           <PatientForm onSuccess={() => setActiveDialog(null)} />
         </DialogContent>
@@ -150,7 +153,10 @@ export function QuickActions() {
       <Dialog open={activeDialog === "procedure"} onOpenChange={() => setActiveDialog(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Record New Procedure</DialogTitle>
+            <DialogTitle>Registar Novo Procedimento</DialogTitle>
+            <DialogDescription>
+              Registe um novo procedimento realizado para um paciente.
+            </DialogDescription>
           </DialogHeader>
           <ProcedureForm onSuccess={() => setActiveDialog(null)} />
         </DialogContent>

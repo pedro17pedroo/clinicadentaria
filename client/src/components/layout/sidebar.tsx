@@ -10,7 +10,8 @@ import {
   Activity, 
   DollarSign, 
   UserCog, 
-  Settings 
+  Settings,
+  Stethoscope 
 } from "lucide-react";
 import { NAVIGATION_ITEMS, ADMIN_NAVIGATION_ITEMS, USER_TYPES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ const iconMap = {
   DollarSign,
   UserCog,
   Settings,
+  Stethoscope,
 };
 
 export function Sidebar() {
@@ -49,8 +51,8 @@ export function Sidebar() {
             <Torus className="h-6 w-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-sidebar-foreground">DentalCare Pro</h1>
-            <p className="text-sm text-sidebar-foreground/70">Management System</p>
+            <h1 className="text-xl font-bold text-sidebar-foreground">Excelso</h1>
+            <p className="text-sm text-sidebar-foreground/70">Sistema de Gestão</p>
           </div>
         </div>
 
@@ -86,7 +88,7 @@ export function Sidebar() {
               <Separator className="my-4" />
               <div className="pt-4">
                 <p className="text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wide mb-2 px-3">
-                  Administration
+                  Administração
                 </p>
                 {ADMIN_NAVIGATION_ITEMS.map((item) => {
                   const Icon = iconMap[item.icon as keyof typeof iconMap];

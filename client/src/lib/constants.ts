@@ -29,31 +29,31 @@ export const NAVIGATION_ITEMS = [
     roles: [USER_TYPES.ADMIN, USER_TYPES.EMPLOYEE, USER_TYPES.DOCTOR],
   },
   {
-    title: 'Appointments',
+    title: 'Consultas',
     href: '/appointments',
     icon: 'Calendar',
     roles: [USER_TYPES.ADMIN, USER_TYPES.EMPLOYEE, USER_TYPES.DOCTOR],
   },
   {
-    title: 'Patients',
+    title: 'Pacientes',
     href: '/patients',
     icon: 'Users',
     roles: [USER_TYPES.ADMIN, USER_TYPES.EMPLOYEE, USER_TYPES.DOCTOR],
   },
   {
-    title: 'Procedures',
+    title: 'Procedimentos',
     href: '/procedures',
     icon: 'Activity',
     roles: [USER_TYPES.ADMIN, USER_TYPES.EMPLOYEE, USER_TYPES.DOCTOR],
   },
   {
-    title: 'Finances',
+    title: 'Finanças',
     href: '/finances',
     icon: 'DollarSign',
     roles: [USER_TYPES.ADMIN, USER_TYPES.EMPLOYEE],
   },
   {
-    title: 'Reports',
+    title: 'Relatórios',
     href: '/reports',
     icon: 'BarChart3',
     roles: [USER_TYPES.ADMIN, USER_TYPES.EMPLOYEE],
@@ -62,13 +62,19 @@ export const NAVIGATION_ITEMS = [
 
 export const ADMIN_NAVIGATION_ITEMS = [
   {
-    title: 'User Management',
+    title: 'Gestão de Usuários',
     href: '/user-management',
     icon: 'UserCog',
     roles: [USER_TYPES.ADMIN],
   },
   {
-    title: 'System Config',
+    title: 'Gestão de Médicos',
+    href: '/doctor-management',
+    icon: 'Stethoscope',
+    roles: [USER_TYPES.ADMIN],
+  },
+  {
+    title: 'Configurações do Sistema',
     href: '/system-config',
     icon: 'Settings',
     roles: [USER_TYPES.ADMIN],

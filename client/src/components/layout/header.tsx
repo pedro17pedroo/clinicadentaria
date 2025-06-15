@@ -1,14 +1,16 @@
-import { useAuth } from "@/hooks/useAuth";
+import { Moon, Sun, Bell, ChevronDown, LogOut } from "lucide-react";
+import { useTheme } from "next-themes";
+import { useTraditionalAuth } from "@/hooks/useTraditionalAuth";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "next-themes";
-import { Moon, Sun, Bell, ChevronDown, LogOut } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 
 interface HeaderProps {
@@ -17,43 +19,89 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
-  const { user } = useAuth();
+  const auth = useTraditionalAuth();
   const { theme, setTheme } = useTheme();
-
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
-  };
-
+  const user = auth.user;
+  
+  // Funções auxiliares para manipulação de dados do usuário
   const getUserInitials = (user: any) => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    // Acessar dados do Mongoose através de _doc se disponível
+    const userData = user?._doc || user;
+    
+    if (userData?.firstName && userData?.lastName) {
+      return `${userData.firstName[0]}${userData.lastName[0]}`.toUpperCase();
     }
-    if (user?.email) {
-      return user.email.slice(0, 2).toUpperCase();
+    if (userData?.name) {
+      // Usar o campo name se disponível
+      const nameParts = userData.name.split(' ');
+      if (nameParts.length >= 2) {
+        return `${nameParts[0][0]}${nameParts[nameParts.length - 1][0]}`.toUpperCase();
+      }
+      return userData.name.slice(0, 2).toUpperCase();
+    }
+    if (userData?.email) {
+      return userData.email.slice(0, 2).toUpperCase();
     }
     return "U";
   };
 
   const getUserDisplayName = (user: any) => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName} ${user.lastName}`;
+    if (!user) return "User";
+    
+    // Acessar dados do Mongoose através de _doc se disponível
+    const userData = user._doc || user;
+    
+    if (userData.firstName && userData.lastName) {
+      return `${userData.firstName} ${userData.lastName}`;
     }
-    if (user?.email) {
-      return user.email;
+    if (userData.name) {
+      return userData.name;
+    }
+    if (userData.email) {
+      return userData.email;
     }
     return "User";
   };
 
-  const getUserRoleDisplay = (userType: string) => {
-    switch (userType) {
+  const getUserRoleDisplay = (user: any) => {
+    if (!user) return 'User';
+    
+    // Acessar dados do Mongoose através de _doc se disponível
+    const userData = user._doc || user;
+    const userType = userData.userType;
+    
+    if (!userType) return 'User';
+    
+    // Converter para string se não for
+    const typeStr = String(userType).toLowerCase();
+    
+    switch (typeStr) {
       case 'admin':
-        return 'Administrator';
+        return 'Administrador';
       case 'employee':
-        return 'Employee';
+        return 'Funcionário';
       case 'doctor':
-        return 'Doctor';
+        return 'Médico';
       default:
         return 'User';
+    }
+  };
+  
+  const handleLogout = async () => {
+    try {
+      // Chama a API de logout no servidor
+      await fetch('/api/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch (error) {
+      console.error('Erro ao fazer logout no servidor:', error);
+    } finally {
+      // Remove os dados locais e redireciona
+      auth.logout();
+      window.location.href = '/';
     }
   };
 
@@ -101,7 +149,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               <div className="text-left hidden md:block">
                 <p className="text-sm font-medium">{getUserDisplayName(user)}</p>
                 <p className="text-xs text-muted-foreground">
-                  {user?.userType ? getUserRoleDisplay(user.userType) : 'User'}
+                  {getUserRoleDisplay(user)}
                 </p>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />

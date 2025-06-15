@@ -12,51 +12,51 @@ interface MetricsProps {
 
 export function DashboardMetrics({ metrics }: MetricsProps) {
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('pt-AO', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'AOA',
     }).format(amount);
   };
 
   const metricCards = [
     {
-      title: "Today's Appointments",
+      title: "Consultas de Hoje",
       value: metrics?.todayAppointments || 0,
       icon: Calendar,
       color: "text-primary",
       bgColor: "bg-primary/10",
       change: "+8%",
-      changeText: "vs yesterday",
+      changeText: "vs ontem",
       trend: "up"
     },
     {
-      title: "Pending Payments",
+      title: "Pagamentos Pendentes",
       value: formatCurrency(metrics?.pendingPayments || 0),
       icon: TrendingUp,
       color: "text-yellow-600 dark:text-yellow-400",
       bgColor: "bg-yellow-100 dark:bg-yellow-900/30",
-      change: "5 invoices",
-      changeText: "pending",
+      change: "5 faturas",
+      changeText: "pendentes",
       trend: "neutral"
     },
     {
-      title: "Monthly Revenue",
+      title: "Receita Mensal",
       value: formatCurrency(metrics?.monthlyRevenue || 0),
       icon: DollarSign,
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-100 dark:bg-green-900/30",
       change: "+15%",
-      changeText: "vs last month",
+      changeText: "vs mês passado",
       trend: "up"
     },
     {
-      title: "Active Patients",
+      title: "Pacientes Ativos",
       value: metrics?.activePatients || 0,
       icon: Users,
       color: "text-purple-600 dark:text-purple-400",
       bgColor: "bg-purple-100 dark:bg-purple-900/30",
       change: "+12",
-      changeText: "new this week",
+      changeText: "novos esta semana",
       trend: "up"
     }
   ];

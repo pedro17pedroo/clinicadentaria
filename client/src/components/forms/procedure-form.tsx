@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -15,14 +15,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Trash2, DollarSign } from "lucide-react";
 
 const procedureItemSchema = z.object({
-  procedureTypeId: z.number().min(1, "Please select a procedure type"),
-  doctorId: z.string().min(1, "Please select a doctor"),
+  procedureTypeId: z.string().min(1, "Por favor selecione um tipo de procedimento"),
+  doctorId: z.string().min(1, "Por favor selecione um médico"),
   notes: z.string().optional(),
 });
 
 const procedureFormSchema = z.object({
-  procedures: z.array(procedureItemSchema).min(1, "At least one procedure is required"),
-  date: z.string().min(1, "Please select a date"),
+  procedures: z.array(procedureItemSchema).min(1, "Pelo menos um procedimento é obrigatório"),
+  date: z.string().min(1, "Por favor selecione uma data"),
+  patientId: z.string().min(1, "Por favor selecione um paciente"),
 });
 
 type ProcedureFormData = z.infer<typeof procedureFormSchema>;
@@ -31,18 +32,37 @@ interface ProcedureFormProps {
   onSuccess?: () => void;
   appointmentId?: number;
   patientId?: number;
+  initialData?: any; // Dados iniciais para edição
 }
 
-export function ProcedureForm({ onSuccess, appointmentId, patientId }: ProcedureFormProps) {
+export function ProcedureForm({ onSuccess, appointmentId, patientId, initialData }: ProcedureFormProps) {
   const { toast } = useToast();
   const [totalCost, setTotalCost] = useState(0);
+  const [isEditing] = useState(!!initialData);
+
+  // Preparar dados iniciais para edição
+  const getInitialValues = () => {
+    if (initialData) {
+      return {
+        procedures: [{
+          procedureTypeId: initialData.procedureTypeId?._id || initialData.procedureTypeId || "",
+          doctorId: initialData.doctorId?._id || initialData.doctorId || "",
+          notes: initialData.notes || "",
+        }],
+        date: initialData.date ? new Date(initialData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        patientId: initialData.patientId?._id || initialData.patientId?.toString() || patientId?.toString() || "",
+      };
+    }
+    return {
+      procedures: [{ procedureTypeId: "", doctorId: "", notes: "" }],
+      date: new Date().toISOString().split('T')[0],
+      patientId: patientId?.toString() || "",
+    };
+  };
 
   const form = useForm<ProcedureFormData>({
     resolver: zodResolver(procedureFormSchema),
-    defaultValues: {
-      procedures: [{ procedureTypeId: 0, doctorId: "", notes: "" }],
-      date: new Date().toISOString().split('T')[0],
-    },
+    defaultValues: getInitialValues(),
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -50,51 +70,98 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId }: Procedure
     name: "procedures",
   });
 
-  const { data: procedureTypes } = useQuery({
+  const { data: procedureTypes = [] } = useQuery({
     queryKey: ["/api/procedure-types"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/procedure-types");
+      return response.json();
+    },
   });
 
-  const { data: currentUser } = useQuery({
-    queryKey: ["/api/auth/user"],
+  const { data: allDoctors = [] } = useQuery({
+    queryKey: ["doctors"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/doctors");
+      return response.json();
+    },
   });
 
-  // For now, just use current user as doctor - in a real app this would fetch all doctors
-  const doctors = currentUser ? [{ 
-    id: currentUser.id, 
-    firstName: currentUser.firstName || 'Dr.', 
-    lastName: currentUser.lastName || 'Unknown' 
-  }] : [];
+  const { data: patients = [] } = useQuery({
+    queryKey: ["patients"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/patients");
+      return response.json();
+    },
+    enabled: !patientId, // Só carrega se não tiver patientId
+  });
+
+  // Função para filtrar médicos baseado na especialidade do procedimento selecionado
+  const getFilteredDoctors = (procedureTypeId: string) => {
+    if (!procedureTypeId || !procedureTypes || !allDoctors) {
+      return allDoctors;
+    }
+    
+    const selectedProcedureType = procedureTypes.find((pt: any) => pt._id?.toString() === procedureTypeId);
+    
+    if (!selectedProcedureType?.specialty) {
+      return allDoctors;
+    }
+    
+    return allDoctors.filter((doctor: any) => 
+      doctor.specialties && doctor.specialties.includes(selectedProcedureType.specialty)
+    );
+  };
 
   const createProceduresMutation = useMutation({
     mutationFn: async (data: ProcedureFormData) => {
-      // Create procedures individually
-      const promises = data.procedures.map(procedure => {
-        const procedureType = procedureTypes?.find((pt: any) => pt.id === procedure.procedureTypeId);
-        return apiRequest("POST", "/api/procedures", {
-          patientId: patientId,
+      if (isEditing && initialData) {
+        // Editar procedimento existente
+        const procedure = data.procedures[0]; // Para edição, assumimos apenas um procedimento
+        const procedureType = procedureTypes?.find?.((pt: any) => pt?._id?.toString?.() === procedure.procedureTypeId);
+        
+        return apiRequest("PUT", `/api/procedures/${initialData._id || initialData.id}`, {
+          patientId: data.patientId,
           appointmentId: appointmentId,
           procedureTypeId: procedure.procedureTypeId,
           doctorId: procedure.doctorId,
           date: data.date,
-          cost: procedureType?.price || 0,
+          cost: procedureType?.price || initialData.cost || 0,
+          status: initialData.status || 'in_progress', // Manter status atual ou definir padrão
           notes: procedure.notes || undefined,
         });
-      });
-      await Promise.all(promises);
+      } else {
+        // Criar novos procedimentos
+        const promises = data.procedures.map(procedure => {
+          const procedureType = procedureTypes?.find?.((pt: any) => pt?.id?.toString?.() === procedure.procedureTypeId);
+          return apiRequest("POST", "/api/procedures", {
+            patientId: data.patientId,
+            appointmentId: appointmentId,
+            procedureTypeId: procedure.procedureTypeId,
+            doctorId: procedure.doctorId,
+            date: data.date,
+            cost: procedureType?.price || 0,
+            status: 'in_progress', // Status padrão para novos procedimentos
+            notes: procedure.notes || undefined,
+          });
+        });
+        await Promise.all(promises);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/procedures"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       toast({
-        title: "Success",
-        description: "Procedures recorded successfully",
+        title: "Sucesso",
+        description: isEditing ? "Procedimento atualizado com sucesso" : "Procedimentos registados com sucesso",
       });
-      form.reset();
+      if (!isEditing) {
+        form.reset();
+      }
       onSuccess?.();
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Erro",
         description: error.message,
         variant: "destructive",
       });
@@ -105,26 +172,87 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId }: Procedure
     createProceduresMutation.mutate(data);
   };
 
-  // Calculate total cost when procedures change
-  useEffect(() => {
-    const watchedProcedures = form.watch("procedures");
-    const total = watchedProcedures.reduce((sum, procedure) => {
-      const procedureType = procedureTypes?.find((pt: any) => pt.id === procedure.procedureTypeId);
-      return sum + (procedureType ? Number(procedureType.price) : 0);
-    }, 0);
-    setTotalCost(total);
-  }, [form.watch("procedures"), procedureTypes]);
+  // Watch procedures for changes
+  const watchedProcedures = form.watch("procedures");
+  
+  // Calculate total cost using useMemo for better performance and reliability
+  const calculatedTotal = useMemo(() => {
+    if (!procedureTypes || procedureTypes.length === 0 || !watchedProcedures) {
+      return 0;
+    }
 
+    return watchedProcedures.reduce((sum, procedure) => {
+      if (!procedure?.procedureTypeId) {
+        return sum;
+      }
+      
+      const procedureType = procedureTypes.find((pt: any) => 
+        pt?._id?.toString() === procedure.procedureTypeId
+      );
+      
+      if (procedureType?.price && typeof procedureType.price === 'number') {
+        return sum + procedureType.price;
+      }
+      
+      return sum;
+    }, 0);
+  }, [watchedProcedures, procedureTypes]);
+  
+  // Update totalCost when calculatedTotal changes
+  useEffect(() => {
+    setTotalCost(calculatedTotal);
+  }, [calculatedTotal]);
+
+  if (!procedureTypes || !allDoctors) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <div className="h-[80vh] flex flex-col">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
+          {/* Conteúdo principal com scroll */}
+          <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+        {/* Patient Selection - only show if patientId not provided */}
+        {!patientId && (
+          <FormField
+            control={form.control}
+            name="patientId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Paciente *</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um paciente" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {patients?.map?.((patient: any) => (
+                      patient && patient._id ? (
+                        <SelectItem key={patient._id} value={patient._id.toString()}>
+                          {patient.name}
+                        </SelectItem>
+                      ) : null
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
         {/* Date Field */}
         <FormField
           control={form.control}
           name="date"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Procedure Date *</FormLabel>
+              <FormLabel>Data do Procedimento *</FormLabel>
               <FormControl>
                 <Input
                   type="date"
@@ -140,23 +268,25 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId }: Procedure
         {/* Procedures List */}
         <div className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Procedures</h3>
+            <h3 className="text-lg font-semibold">Procedimentos</h3>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => append({ procedureTypeId: 0, doctorId: "", notes: "" })}
+              onClick={() => append({ procedureTypeId: "", doctorId: "", notes: "" })}
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add Procedure
+              Adicionar Procedimento
             </Button>
           </div>
 
-          {fields.map((field, index) => (
+          {/* Lista de procedimentos */}
+          <div className="space-y-4">
+            {fields.map((field, index) => (
             <Card key={field.id}>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex justify-between items-center">
-                  Procedure {index + 1}
+                  Procedimento {index + 1}
                   {fields.length > 1 && (
                     <Button
                       type="button"
@@ -176,26 +306,39 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId }: Procedure
                     name={`procedures.${index}.procedureTypeId`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Procedure Type *</FormLabel>
+                        <FormLabel>Tipo de Procedimento *</FormLabel>
                         <Select
-                          onValueChange={(value) => field.onChange(parseInt(value))}
-                          value={field.value?.toString() || ""}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            // Limpar seleção de médico quando mudar tipo de procedimento
+                            form.setValue(`procedures.${index}.doctorId`, "");
+                          }}
+                          value={field.value || ""}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select procedure type" />
+                              <SelectValue placeholder="Selecione o tipo de procedimento" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {procedureTypes?.map((type: any) => (
-                              <SelectItem key={type.id} value={type.id.toString()}>
-                                <div className="flex justify-between items-center w-full">
-                                  <span>{type.name}</span>
-                                  <span className="text-muted-foreground ml-2">
-                                    ${Number(type.price).toFixed(2)}
-                                  </span>
-                                </div>
-                              </SelectItem>
+                            {procedureTypes?.map?.((type: any) => (
+                              type && type._id ? (
+                                <SelectItem key={type._id} value={type._id.toString()}>
+                                  <div className="flex flex-col items-start w-full">
+                                    <div className="flex justify-between items-center w-full">
+                                      <span>{type.name || 'Procedimento sem nome'}</span>
+                                      <span className="text-muted-foreground ml-2">
+                                        {type.price ? Number(type.price).toFixed(2) : '0.00'} AOA
+                                      </span>
+                                    </div>
+                                    {type.specialty && (
+                                      <span className="text-xs text-muted-foreground mt-1">
+                                        Especialidade: {type.specialty}
+                                      </span>
+                                    )}
+                                  </div>
+                                </SelectItem>
+                              ) : null
                             ))}
                           </SelectContent>
                         </Select>
@@ -207,26 +350,54 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId }: Procedure
                   <FormField
                     control={form.control}
                     name={`procedures.${index}.doctorId`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Doctor *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a doctor" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {doctors.map((doctor: any) => (
-                              <SelectItem key={doctor.id} value={doctor.id}>
-                                {doctor.firstName} {doctor.lastName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    render={({ field }) => {
+                      const selectedProcedureTypeId = form.watch(`procedures.${index}.procedureTypeId`);
+                      const filteredDoctors = getFilteredDoctors(selectedProcedureTypeId);
+                      
+                      return (
+                        <FormItem>
+                          <FormLabel>Médico *</FormLabel>
+                          <Select
+                            onValueChange={(value) => {
+                              field.onChange(value);
+                            }}
+                            value={field.value || ""}
+                            disabled={!selectedProcedureTypeId}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue 
+                                  placeholder={
+                                    !selectedProcedureTypeId 
+                                      ? "Primeiro selecione um tipo de procedimento" 
+                                      : filteredDoctors.length === 0
+                                      ? "Nenhum médico habilitado para este procedimento"
+                                      : "Selecione um médico"
+                                  } 
+                                />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {filteredDoctors?.map?.((doctor: any) => (
+                                doctor && doctor._id ? (
+                                  <SelectItem key={doctor._id} value={doctor._id.toString()}>
+                                    <div className="flex flex-col">
+                                      <span>Dr. {doctor.firstName || 'Nome'} {doctor.lastName || 'Desconhecido'}</span>
+                                      {doctor.specialties && doctor.specialties.length > 0 && (
+                                        <span className="text-xs text-muted-foreground">
+                                          {doctor.specialties.join(', ')}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ) : null
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
                 </div>
 
@@ -235,10 +406,10 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId }: Procedure
                   name={`procedures.${index}.notes`}
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Procedure Notes</FormLabel>
+                      <FormLabel>Notas do Procedimento</FormLabel>
                       <FormControl>
                         <Textarea 
-                          placeholder="Enter procedure details, observations, or special notes..."
+                          placeholder="Insira detalhes do procedimento, observações ou notas especiais..."
                           className="min-h-[80px]"
                           {...field} 
                         />
@@ -250,16 +421,16 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId }: Procedure
 
                 {/* Show cost for selected procedure */}
                 {(() => {
-                  const selectedType = procedureTypes?.find((pt: any) => 
-                    pt.id === form.watch(`procedures.${index}.procedureTypeId`)
+                  const selectedType = procedureTypes?.find?.((pt: any) => 
+                    pt?._id?.toString?.() === form.watch(`procedures.${index}.procedureTypeId`)
                   );
                   return selectedType && (
                     <div className="p-3 bg-muted/50 rounded-lg border">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{selectedType.name}</span>
+                        <span className="text-sm font-medium">{selectedType.name || 'Procedimento'}</span>
                         <Badge variant="secondary" className="text-sm">
                           <DollarSign className="h-3 w-3 mr-1" />
-                          {Number(selectedType.price).toFixed(2)}
+                          {selectedType.price ? Number(selectedType.price).toFixed(2) : '0.00'} AOA
                         </Badge>
                       </div>
                     </div>
@@ -267,35 +438,46 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId }: Procedure
                 })()}
               </CardContent>
             </Card>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {/* Total Cost Summary */}
-        {totalCost > 0 && (
-          <Card className="bg-primary/5 border-primary/20">
+        {/* Custo Total */}
+        {fields.length > 0 && (
+          <Card className="bg-muted/50">
             <CardContent className="pt-6">
               <div className="flex justify-between items-center">
-                <span className="text-lg font-semibold">Total Cost</span>
+                <div>
+                  <span className="text-lg font-semibold">Custo Total</span>
+                  <p className="text-sm text-muted-foreground">
+                    {fields.length} procedimento{fields.length > 1 ? 's' : ''}
+                  </p>
+                </div>
                 <span className="text-2xl font-bold text-primary">
-                  ${totalCost.toFixed(2)}
+                  {totalCost.toFixed(2)} AOA
                 </span>
               </div>
             </CardContent>
           </Card>
         )}
+          </div>
 
-        <div className="flex justify-end space-x-3">
-          <Button type="button" variant="outline" onClick={() => form.reset()}>
-            Cancel
-          </Button>
-          <Button type="submit" disabled={createProceduresMutation.isPending}>
-            {createProceduresMutation.isPending && (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            )}
-            Record Procedures
-          </Button>
-        </div>
-      </form>
+          {/* Rodapé fixo com botões de ação */}
+          <div className="border-t pt-4 mt-4 bg-background">
+            <div className="flex justify-end space-x-3">
+              <Button type="button" variant="outline" onClick={() => form.reset()}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createProceduresMutation.isPending}>
+                {createProceduresMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Registar Procedimentos
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
     </Form>
   );
 }

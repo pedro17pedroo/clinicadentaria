@@ -1,210 +1,630 @@
-import {
-  pgTable,
-  text,
-  varchar,
-  timestamp,
-  jsonb,
-  index,
-  serial,
-  integer,
-  decimal,
-  boolean,
-  date,
-  time,
-} from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import mongoose, { Schema, Document, Types } from 'mongoose';
+import { z } from 'zod';
 
-// Session storage table for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
+// ============================================================================
+// INTERFACES E TIPOS TYPESCRIPT
+// ============================================================================
+
+// Interface para Utilizador
+export interface IUser extends Document {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  userType: 'admin' | 'employee' | 'doctor';
+  specialties?: string[];
+  contactInfo?: string;
+  isActive: boolean;
+  password?: string; // Para autenticação tradicional
+  mustChangePassword?: boolean; // Forçar mudança de password no primeiro login
+  passwordResetToken?: string; // Token para reset de password
+  // Campos específicos para médicos
+  workingDays?: string[];
+  workingHours?: { start: string; end: string };
+  dailySchedules?: {
+    [key: string]: {
+      start: string;
+      end: string;
+      isActive: boolean;
+    };
+  };
+  consultationTypes?: string[];
+  procedureTypes?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Interface para Paciente
+export interface IPatient extends Document {
+  name: string;
+  di?: string; // Documento de Identidade
+  nif?: string; // Número de Identificação Fiscal (único e opcional)
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Interface para Tipo de Consulta
+export interface IConsultationType extends Document {
+  name: string;
+  price: number;
+  description?: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+// Interface para Tipo de Procedimento
+export interface IProcedureType extends Document {
+  name: string;
+  price: number;
+  category?: string;
+  description?: string;
+  specialty?: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+// Interface para Consulta
+export interface IAppointment extends Document {
+  patientId: Types.ObjectId;
+  doctorId: Types.ObjectId;
+  consultationTypeId: Types.ObjectId;
+  date: Date;
+  time: string;
+  status: 'scheduled' | 'cancelled' | 'completed';
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Interface para Procedimento
+export interface IProcedure extends Document {
+  appointmentId?: Types.ObjectId;
+  patientId: Types.ObjectId;
+  doctorId: Types.ObjectId;
+  procedureTypeId: Types.ObjectId;
+  date: Date;
+  cost: number;
+  status: 'in_progress' | 'completed';
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Interface para Tipo de Transação
+export interface ITransactionType extends Document {
+  name: string;
+  category: 'income' | 'expense';
+  description?: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+// Interface para Transação Financeira
+export interface ITransaction extends Document {
+  patientId?: Types.ObjectId;
+  appointmentId?: Types.ObjectId;
+  procedureId?: Types.ObjectId;
+  transactionTypeId: Types.ObjectId;
+  amount: number;
+  status: 'pending' | 'paid' | 'overdue';
+  description?: string;
+  transactionDate: Date;
+  dueDate?: Date;
+  paidDate?: Date;
+  createdAt: Date;
+}
+
+// Interface para Configuração de Tipo de Utilizador
+export interface IUserTypeConfig extends Document {
+  name: string;
+  permissions: Record<string, boolean>;
+  description?: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
+// ============================================================================
+// SCHEMAS MONGOOSE
+// ============================================================================
+
+// Schema para Utilizador
+const userSchema = new Schema<IUser>({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
   },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
-
-// User storage table for Replit Auth
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  userType: varchar("user_type").notNull().default("employee"), // admin, employee, doctor
-  specialties: text("specialties").array(), // for doctors
-  contactInfo: varchar("contact_info"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+  firstName: {
+    type: String,
+    trim: true
+  },
+  lastName: {
+    type: String,
+    trim: true
+  },
+  profileImageUrl: String,
+  password: {
+    type: String,
+    trim: true
+  },
+  mustChangePassword: {
+    type: Boolean,
+    default: false
+  },
+  passwordResetToken: {
+    type: String,
+    trim: true
+  },
+  userType: {
+    type: String,
+    enum: ['admin', 'employee', 'doctor'],
+    default: 'employee',
+    required: true
+  },
+  specialties: [{
+    type: String,
+    trim: true
+  }],
+  contactInfo: {
+    type: String,
+    trim: true
+  },
+  // Campos específicos para médicos
+  workingDays: [{
+    type: String,
+    trim: true
+  }],
+  workingHours: {
+    start: {
+      type: String,
+      trim: true
+    },
+    end: {
+      type: String,
+      trim: true
+    }
+  },
+  consultationTypes: [{
+    type: String,
+    trim: true
+  }],
+  procedureTypes: [{
+    type: String,
+    trim: true
+  }],
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
 });
 
-// Patients table
-export const patients = pgTable("patients", {
-  id: serial("id").primaryKey(),
-  name: varchar("name").notNull(),
-  cpf: varchar("cpf").unique().notNull(),
-  phone: varchar("phone"),
-  email: varchar("email"),
-  address: text("address"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+// Schema para Paciente
+const patientSchema = new Schema<IPatient>({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  di: {
+    type: String,
+    required: false,
+    sparse: true, // Permite múltiplos valores null/undefined
+    trim: true
+  },
+  nif: {
+    type: String,
+    required: false,
+    sparse: true, // Permite múltiplos valores null/undefined
+    trim: true
+  },
+  phone: {
+    type: String,
+    trim: true
+  },
+  email: {
+    type: String,
+    lowercase: true,
+    trim: true
+  },
+  address: {
+    type: String,
+    trim: true
+  },
+  notes: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
 });
 
-// Consultation types configuration
-export const consultationTypes = pgTable("consultation_types", {
-  id: serial("id").primaryKey(),
-  name: varchar("name").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  description: text("description"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
+// Schema para Tipo de Consulta
+const consultationTypeSchema = new Schema<IConsultationType>({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-// Procedure types configuration
-export const procedureTypes = pgTable("procedure_types", {
-  id: serial("id").primaryKey(),
-  name: varchar("name").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
-  category: varchar("category"),
-  description: text("description"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
+// Schema para Tipo de Procedimento
+const procedureTypeSchema = new Schema<IProcedureType>({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  category: {
+    type: String,
+    trim: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  specialty: {
+    type: String,
+    trim: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-// Appointments table
-export const appointments = pgTable("appointments", {
-  id: serial("id").primaryKey(),
-  patientId: integer("patient_id").notNull().references(() => patients.id),
-  doctorId: varchar("doctor_id").notNull().references(() => users.id),
-  consultationTypeId: integer("consultation_type_id").notNull().references(() => consultationTypes.id),
-  date: date("date").notNull(),
-  time: time("time").notNull(),
-  status: varchar("status").notNull().default("scheduled"), // scheduled, cancelled, completed
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+// Schema para Consulta
+const appointmentSchema = new Schema<IAppointment>({
+  patientId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Patient',
+    required: true
+  },
+  doctorId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  consultationTypeId: {
+    type: Schema.Types.ObjectId,
+    ref: 'ConsultationType',
+    required: true
+  },
+  date: {
+    type: Date,
+    required: true
+  },
+  time: {
+    type: String,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['scheduled', 'cancelled', 'completed'],
+    default: 'scheduled'
+  },
+  notes: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
 });
 
-// Procedures table
-export const procedures = pgTable("procedures", {
-  id: serial("id").primaryKey(),
-  appointmentId: integer("appointment_id").references(() => appointments.id),
-  patientId: integer("patient_id").notNull().references(() => patients.id),
-  doctorId: varchar("doctor_id").notNull().references(() => users.id),
-  procedureTypeId: integer("procedure_type_id").notNull().references(() => procedureTypes.id),
-  date: date("date").notNull(),
-  cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
+// Schema para Procedimento
+const procedureSchema = new Schema<IProcedure>({
+  appointmentId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Appointment'
+  },
+  patientId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Patient',
+    required: true
+  },
+  doctorId: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  procedureTypeId: {
+    type: Schema.Types.ObjectId,
+    ref: 'ProcedureType',
+    required: true
+  },
+  date: {
+    type: Date,
+    required: true
+  },
+  cost: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  status: {
+    type: String,
+    enum: ['in_progress', 'completed'],
+    default: 'in_progress'
+  },
+  notes: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
 });
 
-// Transaction types configuration
-export const transactionTypes = pgTable("transaction_types", {
-  id: serial("id").primaryKey(),
-  name: varchar("name").notNull(),
-  category: varchar("category").notNull(), // income, expense
-  description: text("description"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
+// Schema para Tipo de Transação
+const transactionTypeSchema = new Schema<ITransactionType>({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  category: {
+    type: String,
+    enum: ['income', 'expense'],
+    required: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-// Financial transactions table
-export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
-  patientId: integer("patient_id").references(() => patients.id),
-  appointmentId: integer("appointment_id").references(() => appointments.id),
-  procedureId: integer("procedure_id").references(() => procedures.id),
-  transactionTypeId: integer("transaction_type_id").notNull().references(() => transactionTypes.id),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
-  status: varchar("status").notNull().default("pending"), // pending, paid, overdue
-  description: text("description"),
-  transactionDate: timestamp("transaction_date").defaultNow(),
-  dueDate: date("due_date"),
-  paidDate: timestamp("paid_date"),
-  createdAt: timestamp("created_at").defaultNow(),
+// Schema para Transação Financeira
+const transactionSchema = new Schema<ITransaction>({
+  patientId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Patient'
+  },
+  appointmentId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Appointment'
+  },
+  procedureId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Procedure'
+  },
+  transactionTypeId: {
+    type: Schema.Types.ObjectId,
+    ref: 'TransactionType',
+    required: true
+  },
+  amount: {
+    type: Number,
+    required: true
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'paid', 'overdue'],
+    default: 'pending'
+  },
+  description: String,
+  transactionDate: {
+    type: Date,
+    default: Date.now
+  },
+  dueDate: Date,
+  paidDate: Date,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-// User type configurations
-export const userTypeConfigs = pgTable("user_type_configs", {
-  id: serial("id").primaryKey(),
-  name: varchar("name").notNull().unique(),
-  permissions: jsonb("permissions").notNull(), // JSON object with permission flags
-  description: text("description"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
+// Schema para Configuração de Tipo de Utilizador
+const userTypeConfigSchema = new Schema<IUserTypeConfig>({
+  name: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
+  },
+  permissions: {
+    type: Schema.Types.Mixed,
+    required: true
+  },
+  description: {
+    type: String,
+    trim: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
 });
 
-// Schema exports for types
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
+// ============================================================================
+// ÍNDICES PARA PERFORMANCE
+// ============================================================================
 
-export type InsertPatient = typeof patients.$inferInsert;
-export type Patient = typeof patients.$inferSelect;
+// Índices para Utilizadores
+userSchema.index({ email: 1 });
+userSchema.index({ userType: 1 });
+userSchema.index({ isActive: 1 });
 
-export type InsertConsultationType = typeof consultationTypes.$inferInsert;
-export type ConsultationType = typeof consultationTypes.$inferSelect;
+// Índices para Pacientes
+patientSchema.index({ di: 1 }, { unique: true, sparse: true }); // Índice único e esparso para DI
+patientSchema.index({ nif: 1 }, { unique: true, sparse: true }); // Índice único e esparso para NIF
+patientSchema.index({ name: 1 });
+patientSchema.index({ email: 1 });
 
-export type InsertProcedureType = typeof procedureTypes.$inferInsert;
-export type ProcedureType = typeof procedureTypes.$inferSelect;
+// Índices para Consultas
+appointmentSchema.index({ patientId: 1 });
+appointmentSchema.index({ doctorId: 1 });
+appointmentSchema.index({ date: 1 });
+appointmentSchema.index({ status: 1 });
+appointmentSchema.index({ date: 1, doctorId: 1 }); // Índice composto para verificar disponibilidade
 
-export type InsertTransactionType = typeof transactionTypes.$inferInsert;
-export type TransactionType = typeof transactionTypes.$inferSelect;
+// Índices para Procedimentos
+procedureSchema.index({ patientId: 1 });
+procedureSchema.index({ doctorId: 1 });
+procedureSchema.index({ date: 1 });
 
-export type InsertAppointment = typeof appointments.$inferInsert;
-export type Appointment = typeof appointments.$inferSelect;
+// Índices para Transações
+transactionSchema.index({ patientId: 1 });
+transactionSchema.index({ status: 1 });
+transactionSchema.index({ transactionDate: 1 });
+transactionSchema.index({ dueDate: 1 });
 
-export type InsertProcedure = typeof procedures.$inferInsert;
-export type Procedure = typeof procedures.$inferSelect;
+// ============================================================================
+// MODELOS MONGOOSE
+// ============================================================================
 
-export type InsertTransaction = typeof transactions.$inferInsert;
-export type Transaction = typeof transactions.$inferSelect;
+export const User = mongoose.model<IUser>('User', userSchema);
+export const Patient = mongoose.model<IPatient>('Patient', patientSchema);
+export const ConsultationType = mongoose.model<IConsultationType>('ConsultationType', consultationTypeSchema);
+export const ProcedureType = mongoose.model<IProcedureType>('ProcedureType', procedureTypeSchema);
+export const Appointment = mongoose.model<IAppointment>('Appointment', appointmentSchema);
+export const Procedure = mongoose.model<IProcedure>('Procedure', procedureSchema);
+export const TransactionType = mongoose.model<ITransactionType>('TransactionType', transactionTypeSchema);
+export const Transaction = mongoose.model<ITransaction>('Transaction', transactionSchema);
+export const UserTypeConfig = mongoose.model<IUserTypeConfig>('UserTypeConfig', userTypeConfigSchema);
 
-export type InsertUserTypeConfig = typeof userTypeConfigs.$inferInsert;
-export type UserTypeConfig = typeof userTypeConfigs.$inferSelect;
+// ============================================================================
+// VALIDAÇÕES ZOD PARA FORMULÁRIOS
+// ============================================================================
 
-// Zod schemas for validation
-export const insertPatientSchema = createInsertSchema(patients).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+// Validação para criação de utilizador
+export const createUserSchema = z.object({
+  email: z.string().email('Email inválido'),
+  firstName: z.string().min(1, 'Nome é obrigatório').optional(),
+  lastName: z.string().min(1, 'Apelido é obrigatório').optional(),
+  userType: z.enum(['admin', 'employee', 'doctor']),
+  specialties: z.array(z.string()).optional(),
+  contactInfo: z.string().optional()
 });
 
-export const insertConsultationTypeSchema = createInsertSchema(consultationTypes).omit({
-  id: true,
-  createdAt: true,
+// Validação para criação de paciente
+export const createPatientSchema = z.object({
+  name: z.string().min(1, 'Nome é obrigatório'),
+  di: z.string().optional(), // Documento de Identidade
+  nif: z.string().optional(), // Número de Identificação Fiscal
+  phone: z.string().optional(),
+  email: z.string().email('Email inválido').optional(),
+  address: z.string().optional(),
+  notes: z.string().optional()
 });
 
-export const insertProcedureTypeSchema = createInsertSchema(procedureTypes).omit({
-  id: true,
-  createdAt: true,
+// Validação para criação de consulta
+export const createAppointmentSchema = z.object({
+  patientId: z.string().min(1, 'Paciente é obrigatório'),
+  doctorId: z.string().min(1, 'Médico é obrigatório'),
+  consultationTypeId: z.string().min(1, 'Tipo de consulta é obrigatório'),
+  date: z.string().min(1, 'Data é obrigatória'),
+  time: z.string().min(1, 'Hora é obrigatória'),
+  status: z.enum(['scheduled', 'cancelled', 'completed']).optional(),
+  notes: z.string().optional()
 });
 
-export const insertTransactionTypeSchema = createInsertSchema(transactionTypes).omit({
-  id: true,
-  createdAt: true,
+// Validação para criação de procedimento
+export const createProcedureSchema = z.object({
+  appointmentId: z.string().optional(),
+  patientId: z.string().min(1, 'Paciente é obrigatório'),
+  doctorId: z.string().min(1, 'Médico é obrigatório'),
+  procedureTypeId: z.string().min(1, 'Tipo de procedimento é obrigatório'),
+  date: z.string().min(1, 'Data é obrigatória'),
+  cost: z.number().min(0, 'Custo deve ser positivo'),
+  status: z.enum(['in_progress', 'completed', 'cancelled']).optional(),
+  notes: z.string().optional()
 });
 
-export const insertAppointmentSchema = createInsertSchema(appointments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
+// Validação para criação de transação
+export const createTransactionSchema = z.object({
+  patientId: z.string().optional(),
+  appointmentId: z.string().optional(),
+  procedureId: z.string().optional(),
+  transactionTypeId: z.string().min(1, 'Tipo de transação é obrigatório'),
+  amount: z.number().min(0, 'Valor deve ser positivo'),
+  description: z.string().optional(),
+  status: z.enum(['pending', 'paid', 'overdue']).optional(),
+  dueDate: z.string().optional(),
+  paidDate: z.string().optional(),
+  transactionDate: z.string().optional()
 });
 
-export const insertProcedureSchema = createInsertSchema(procedures).omit({
-  id: true,
-  createdAt: true,
-});
+// ============================================================================
+// TIPOS PARA EXPORTAÇÃO
+// ============================================================================
 
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
-  id: true,
-  createdAt: true,
-});
+export type CreateUser = z.infer<typeof createUserSchema>;
+export type CreatePatient = z.infer<typeof createPatientSchema>;
+export type CreateAppointment = z.infer<typeof createAppointmentSchema>;
+export type CreateProcedure = z.infer<typeof createProcedureSchema>;
+export type CreateTransaction = z.infer<typeof createTransactionSchema>;
 
-export const insertUserTypeConfigSchema = createInsertSchema(userTypeConfigs).omit({
-  id: true,
-  createdAt: true,
-});
+// Tipos para respostas da API
+export type UserResponse = IUser;
+export type PatientResponse = IPatient;
+export type AppointmentResponse = IAppointment;
+export type ProcedureResponse = IProcedure;
+export type TransactionResponse = ITransaction;

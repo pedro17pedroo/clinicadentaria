@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Plus, CheckCircle, Edit, Clock } from "lucide-react";
 import { AppointmentForm } from "@/components/forms/appointment-form";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -15,16 +15,20 @@ export function TodaysSchedule() {
   const { toast } = useToast();
   const today = new Date().toISOString().split('T')[0];
 
-  const { data: appointments, isLoading } = useQuery({
+  const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["/api/appointments", { date: today }],
   });
 
-  const { data: patients } = useQuery({
+  const { data: patients = [] } = useQuery({
     queryKey: ["/api/patients"],
   });
 
-  const { data: consultationTypes } = useQuery({
+  const { data: consultationTypes = [] } = useQuery({
     queryKey: ["/api/consultation-types"],
+  });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ["/api/users"],
   });
 
   const updateAppointmentMutation = useMutation({
@@ -34,13 +38,13 @@ export function TodaysSchedule() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
       toast({
-        title: "Success",
-        description: "Appointment completed successfully",
+        title: "Sucesso",
+        description: "Consulta concluída com sucesso",
       });
     },
     onError: (error) => {
       toast({
-        title: "Error",
+        title: "Erro",
         description: error.message,
         variant: "destructive",
       });
@@ -56,12 +60,23 @@ export function TodaysSchedule() {
 
   const getPatientName = (patientId: number) => {
     const patient = patients?.find((p: any) => p.id === patientId);
-    return patient?.name || "Unknown Patient";
+    return patient?.name || "Paciente Desconhecido";
   };
 
   const getConsultationType = (consultationTypeId: number) => {
     const consultationType = consultationTypes?.find((ct: any) => ct.id === consultationTypeId);
-    return consultationType?.name || "Unknown Type";
+    return consultationType?.name || "Tipo Desconhecido";
+  };
+
+  const getDoctorName = (doctorId: any) => {
+    if (typeof doctorId === 'object' && doctorId?.firstName && doctorId?.lastName) {
+      return `${doctorId.firstName} ${doctorId.lastName}`;
+    }
+    if (typeof doctorId === 'string') {
+      const doctor = users?.find((u: any) => u.id === doctorId);
+      return doctor ? `${doctor.firstName} ${doctor.lastName}` : "Médico Desconhecido";
+    }
+    return "Médico Desconhecido";
   };
 
   const getStatusColor = (status: string) => {
@@ -83,18 +98,21 @@ export function TodaysSchedule() {
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center space-x-2">
             <Calendar className="h-5 w-5" />
-            <span>Today's Schedule</span>
+            <span>Agenda de Hoje</span>
           </CardTitle>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                New Appointment
+                Nova Consulta
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
-                <DialogTitle>Schedule New Appointment</DialogTitle>
+                <DialogTitle>Agendar Nova Consulta</DialogTitle>
+                <DialogDescription>
+                  Agende uma nova consulta para um paciente.
+                </DialogDescription>
               </DialogHeader>
               <AppointmentForm onSuccess={() => setIsCreateOpen(false)} />
             </DialogContent>
@@ -111,7 +129,7 @@ export function TodaysSchedule() {
         ) : appointments?.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No appointments scheduled for today</p>
+            <p>Nenhuma consulta agendada para hoje</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -137,15 +155,17 @@ export function TodaysSchedule() {
                       {getConsultationType(appointment.consultationTypeId)}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Dr. {appointment.doctorId}
+                      Dr. {getDoctorName(appointment.doctorId)}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <Badge className={getStatusColor(appointment.status)}>
-                    {appointment.status === "scheduled" && <Clock className="h-3 w-3 mr-1" />}
-                    {appointment.status}
-                  </Badge>
+                  {appointment.status === "scheduled" && <Clock className="h-3 w-3 mr-1" />}
+                  {appointment.status === 'scheduled' ? 'Agendado' : 
+                   appointment.status === 'completed' ? 'Concluído' : 
+                   appointment.status === 'cancelled' ? 'Cancelado' : appointment.status}
+                </Badge>
                   <div className="flex space-x-2">
                     {appointment.status === "scheduled" && (
                       <Button
@@ -155,12 +175,12 @@ export function TodaysSchedule() {
                         disabled={updateAppointmentMutation.isPending}
                       >
                         <CheckCircle className="h-4 w-4 mr-1" />
-                        Complete
+                        Concluir
                       </Button>
                     )}
                     <Button size="sm" variant="outline">
                       <Edit className="h-4 w-4 mr-1" />
-                      Edit
+                      Editar
                     </Button>
                   </div>
                 </div>
@@ -172,7 +192,7 @@ export function TodaysSchedule() {
         {appointments?.length > 0 && (
           <div className="mt-4 text-center">
             <Button variant="link" className="text-primary">
-              View Full Schedule
+              Ver Agenda Completa
             </Button>
           </div>
         )}
