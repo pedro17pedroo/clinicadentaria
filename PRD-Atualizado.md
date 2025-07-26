@@ -1,6 +1,5 @@
 # Product Requirements Document (PRD) - Sistema de Gestão Financeira para Clínica Dentária
-## Versão Atualizada - Dezembro 2024
-
+## Versão Atualizada - Junho 2025
 ---
 
 ## 1. Introdução
