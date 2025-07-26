@@ -1,0 +1,9 @@
+{"_id":{"$oid":"6884f245fb567895f9319922"},"name":"Pagamento de Consulta","category":"income","description":"Pagamento referente a consulta realizada","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.319Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319923"},"name":"Pagamento de Procedimento","category":"income","description":"Pagamento referente a procedimento realizado","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.319Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319924"},"name":"Pagamento de Tratamento","category":"income","description":"Pagamento referente a tratamento completo","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.319Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319925"},"name":"Desconto","category":"expense","description":"Desconto aplicado ao paciente","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.319Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319926"},"name":"Estorno","category":"expense","description":"Estorno de pagamento","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.32Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319927"},"name":"Material Odontológico","category":"expense","description":"Compra de materiais odontológicos","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.32Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319928"},"name":"Equipamento","category":"expense","description":"Compra ou manutenção de equipamentos","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.32Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319929"},"name":"Aluguel","category":"expense","description":"Pagamento de aluguel do consultório","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.32Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f931992a"},"name":"Salário","category":"expense","description":"Pagamento de salários","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.32Z"},"__v":0}

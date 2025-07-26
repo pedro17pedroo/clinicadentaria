@@ -1,0 +1,4 @@
+{"_id":{"$oid":"6884f245fb567895f9319910"},"name":"Consulta de Rotina","price":80,"description":"Consulta preventiva e de acompanhamento","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.316Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319911"},"name":"Consulta de Urgência","price":120,"description":"Consulta para casos urgentes","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.316Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319912"},"name":"Consulta Especializada","price":150,"description":"Consulta com especialista","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.317Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319913"},"name":"Avaliação Ortodôntica","price":100,"description":"Avaliação para tratamento ortodôntico","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.317Z"},"__v":0}
