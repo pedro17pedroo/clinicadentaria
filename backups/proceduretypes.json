@@ -1,0 +1,8 @@
+{"_id":{"$oid":"6884f245fb567895f9319918"},"name":"Limpeza Dentária","price":60,"category":"preventivo","description":"Profilaxia e remoção de tártaro","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.318Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f9319919"},"name":"Restauração","price":120,"category":"restaurativo","description":"Restauração de dente cariado","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.318Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f931991a"},"name":"Extração Simples","price":80,"category":"cirurgico","description":"Extração de dente simples","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.318Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f931991b"},"name":"Extração Complexa","price":200,"category":"cirurgico","description":"Extração de dente complexa","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.318Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f931991c"},"name":"Canal Radicular","price":300,"category":"endodontico","description":"Tratamento endodôntico","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.318Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f931991d"},"name":"Clareamento Dental","price":250,"category":"estetico","description":"Clareamento dos dentes","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.318Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f931991e"},"name":"Aplicação de Flúor","price":40,"category":"preventivo","description":"Aplicação tópica de flúor","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.318Z"},"__v":0}
+{"_id":{"$oid":"6884f245fb567895f931991f"},"name":"Prótese Parcial","price":800,"category":"protese","description":"Confecção de prótese parcial","isActive":true,"createdAt":{"$date":"2025-07-26T15:20:37.318Z"},"__v":0}
