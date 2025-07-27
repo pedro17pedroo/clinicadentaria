@@ -6,14 +6,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DollarSign, TrendingUp, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Link } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 export function FinancialOverview() {
-  const { data: transactions } = useQuery({
+  const { data: transactions = [] } = useQuery({
     queryKey: ["/api/transactions"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/transactions");
+      return Array.isArray(response) ? response : [];
+    },
   });
 
-  const { data: patients } = useQuery({
+  const { data: patients = [] } = useQuery({
     queryKey: ["/api/patients"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/patients");
+      return Array.isArray(response) ? response : [];
+    },
   });
 
   const getPatientName = (patientId: number) => {

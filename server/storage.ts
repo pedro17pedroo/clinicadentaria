@@ -695,11 +695,14 @@ class MongoStorage implements IStorage {
     limit?: number;
   }): Promise<{ appointments: IAppointment[]; total: number; totalPages: number; currentPage: number }> {
     try {
+      console.log('[DEBUG] getAppointments called with filters:', filters);
       const query: any = {};
       
       // Filtros de data
       if (filters?.date) {
-        query.date = new Date(filters.date);
+        const dateFilter = new Date(filters.date);
+        console.log('[DEBUG] Date filter applied:', filters.date, '-> MongoDB Date:', dateFilter);
+        query.date = dateFilter;
       } else if (filters?.startDate || filters?.endDate) {
         query.date = {};
         if (filters.startDate) {
@@ -708,6 +711,7 @@ class MongoStorage implements IStorage {
         if (filters.endDate) {
           query.date.$lte = new Date(filters.endDate);
         }
+        console.log('[DEBUG] Date range filter applied:', query.date);
       }
       
       // Filtros por IDs
@@ -761,6 +765,11 @@ class MongoStorage implements IStorage {
       // Contar total de registros
       const total = await Appointment.countDocuments(query);
       const totalPages = Math.ceil(total / limit);
+      
+      console.log('[DEBUG] Final query:', JSON.stringify(query, null, 2));
+      console.log('[DEBUG] Total appointments found:', total);
+      console.log('[DEBUG] Appointments returned:', filteredAppointments.length);
+      console.log('[DEBUG] Sample appointment dates:', filteredAppointments.slice(0, 3).map(apt => ({ id: apt._id, date: apt.date })));
       
       return {
         appointments: filteredAppointments,

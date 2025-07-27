@@ -23,7 +23,7 @@ export default function Appointments() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState('2025-07-28'); // Data onde existem appointments
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [amountPaid, setAmountPaid] = useState('');
   const [consultationPrice, setConsultationPrice] = useState(0);
@@ -43,24 +43,28 @@ export default function Appointments() {
   const { toast } = useToast();
 
   const { data: appointmentsData, isLoading } = useQuery({
-    queryKey: ["/api/appointments", filters],
+    queryKey: ["/api/appointments", filters, selectedDate],
     queryFn: async () => {
       const params = new URLSearchParams();
       
-      // Se selectedDate estiver definido e não houver filtros de data customizados
-      if (selectedDate && !filters.startDate && !filters.endDate) {
-        params.append('date', selectedDate);
-      }
-      
-      // Aplicar filtros
+      // Aplicar filtros apenas se estiverem definidos
       Object.entries(filters).forEach(([key, value]) => {
         if (value && value !== '') {
           params.append(key, value.toString());
         }
       });
       
+      // Se não há filtros de data customizados, usar a data selecionada
+      if (!filters.startDate && !filters.endDate && selectedDate) {
+        params.append('date', selectedDate);
+      }
+      
+      // Cache busting para forçar nova requisição
+      params.append('_t', Date.now().toString());
+      
       const response = await apiRequest("GET", `/api/appointments?${params.toString()}`);
-      return response as any;
+      const data = await response.json();
+      return data;
     },
   });
   
@@ -81,7 +85,7 @@ export default function Appointments() {
     queryKey: ["/api/users", { userType: "doctor" }],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/users?userType=doctor");
-      return response;
+      return response.json();
     },
   });
 

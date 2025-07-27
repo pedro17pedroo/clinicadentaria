@@ -17,18 +17,34 @@ export function TodaysSchedule() {
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ["/api/appointments", { date: today }],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/appointments?date=${today}`);
+      return Array.isArray(response) ? response : [];
+    },
   });
 
   const { data: patients = [] } = useQuery({
     queryKey: ["/api/patients"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/patients");
+      return Array.isArray(response) ? response : [];
+    },
   });
 
   const { data: consultationTypes = [] } = useQuery({
     queryKey: ["/api/consultation-types"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/consultation-types");
+      return Array.isArray(response) ? response : [];
+    },
   });
 
   const { data: users = [] } = useQuery({
     queryKey: ["/api/users"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/users");
+      return Array.isArray(response) ? response : [];
+    },
   });
 
   const updateAppointmentMutation = useMutation({
