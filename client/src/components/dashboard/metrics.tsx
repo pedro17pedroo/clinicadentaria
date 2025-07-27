@@ -11,11 +11,19 @@ interface MetricsProps {
 }
 
 export function DashboardMetrics({ metrics }: MetricsProps) {
+  console.log('📊 [DASHBOARD METRICS COMPONENT] Props recebidas:', metrics);
+  console.log('📊 [DASHBOARD METRICS COMPONENT] Tipo de metrics:', typeof metrics);
+  console.log('📊 [DASHBOARD METRICS COMPONENT] pendingPayments:', metrics?.pendingPayments);
+  console.log('📊 [DASHBOARD METRICS COMPONENT] monthlyRevenue:', metrics?.monthlyRevenue);
+  
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pt-AO', {
+    console.log('💰 [FORMAT CURRENCY] Formatando valor:', amount, 'tipo:', typeof amount);
+    const formatted = new Intl.NumberFormat('pt-AO', {
       style: 'currency',
       currency: 'AOA',
     }).format(amount);
+    console.log('💰 [FORMAT CURRENCY] Resultado formatado:', formatted);
+    return formatted;
   };
 
   const metricCards = [

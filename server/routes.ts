@@ -100,49 +100,71 @@ function requirePermission(permission: string) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const user = (req as any).user;
+      console.log(`🔐 RequirePermission: Verificando permissão '${permission}'`);
+      console.log(`👤 RequirePermission: Utilizador do token:`, user);
       
       if (!user || !user.userId) {
+        console.log(`❌ RequirePermission: Utilizador não autenticado`);
         return res.status(401).json({ message: 'Utilizador não autenticado' });
       }
 
       // Buscar dados completos do utilizador
       const userData = await storage.getUser(user.userId);
+      console.log(`👤 RequirePermission: Dados do utilizador:`, {
+        id: userData?._id,
+        email: userData?.email,
+        userType: userData?.userType,
+        firstName: userData?.firstName,
+        lastName: userData?.lastName
+      });
       
       if (!userData) {
+        console.log(`❌ RequirePermission: Utilizador não encontrado na BD`);
         return res.status(401).json({ message: 'Utilizador não encontrado' });
       }
 
       // Verificar se é admin (admin tem todas as permissões)
       if (userData.userType === 'admin') {
+        console.log(`✅ RequirePermission: Utilizador é admin, acesso permitido`);
         return next();
       }
 
       // Buscar configurações de permissões para o tipo de utilizador
       const userTypeConfigs = await storage.getUserTypeConfigs();
+      console.log(`📋 RequirePermission: Configurações disponíveis:`, userTypeConfigs.map(c => ({ name: c.name, isActive: c.isActive })));
+      
       const userConfig = userTypeConfigs.find(config => 
         config.name.toLowerCase() === userData.userType.toLowerCase() && config.isActive === true
       );
+      console.log(`🔍 RequirePermission: Configuração encontrada para '${userData.userType}':`, userConfig ? { name: userConfig.name, permissions: Object.keys(userConfig.permissions) } : null);
 
       if (!userConfig) {
+        console.log(`❌ RequirePermission: Configuração não encontrada para '${userData.userType}'`);
         return res.status(403).json({ 
           message: `Configuração não encontrada para o tipo de utilizador: ${userData.userType}` 
         });
       }
 
       // Verificar se o utilizador tem a permissão específica
-      if (!userConfig.permissions[permission]) {
+      const hasPermission = userConfig.permissions[permission];
+      console.log(`🔑 RequirePermission: Permissão '${permission}' = ${hasPermission}`);
+      console.log(`📝 RequirePermission: Todas as permissões:`, userConfig.permissions);
+      
+      if (!hasPermission) {
+        console.log(`❌ RequirePermission: Acesso negado para '${permission}'`);
         return res.status(403).json({ 
           message: `Acesso negado. Permissão necessária: ${permission}` 
         });
       }
 
+      console.log(`✅ RequirePermission: Acesso permitido para '${permission}'`);
       // Adicionar dados do utilizador ao request para uso posterior
       (req as any).userData = userData;
       (req as any).userPermissions = userConfig.permissions;
       
       next();
     } catch (error) {
-      console.error('Erro na verificação de permissões:', error);
+      console.error('❌ RequirePermission: Erro na verificação de permissões:', error);
       res.status(500).json({ message: 'Erro interno do servidor' });
     }
   };
@@ -248,12 +270,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard metrics
-  app.get('/api/dashboard/metrics', verifyToken, async (req, res) => {
+  app.get('/api/dashboard/metrics', verifyToken, requirePermission('dashboard.read'), async (req, res) => {
     try {
+      console.log('📊 [DASHBOARD ROUTE] Requisição recebida para /api/dashboard/metrics');
       const metrics = await storage.getDashboardMetrics();
+      console.log('📊 [DASHBOARD ROUTE] Métricas obtidas:', metrics);
       res.json(metrics);
     } catch (error) {
-      console.error("Error fetching dashboard metrics:", error);
+      console.error("❌ [DASHBOARD ROUTE] Error fetching dashboard metrics:", error);
       res.status(500).json({ message: "Failed to fetch dashboard metrics" });
     }
   });
@@ -792,8 +816,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/transactions', verifyToken, requirePermission('transactions.read'), async (req, res) => {
     try {
       const { patientId, status, dateFrom, dateTo, page, limit } = req.query;
-      const filters: any = {};
+      console.log('💰 GET /api/transactions - Query params:', req.query);
       
+      const filters: any = {};
       if (patientId && typeof patientId === 'string') filters.patientId = patientId;
       if (status && typeof status === 'string') filters.status = status;
       if (dateFrom && typeof dateFrom === 'string') filters.dateFrom = dateFrom;
@@ -801,10 +826,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (page && typeof page === 'string') filters.page = parseInt(page, 10);
       if (limit && typeof limit === 'string') filters.limit = parseInt(limit, 10);
       
+      console.log('💰 GET /api/transactions - Filtros aplicados:', filters);
+      
       const result = await storage.getTransactions(filters);
+      console.log('💰 GET /api/transactions - Resultado:', {
+        totalTransactions: result.transactions.length,
+        total: result.total,
+        currentPage: result.currentPage,
+        totalPages: result.totalPages,
+        sampleTransactions: result.transactions.slice(0, 2).map(t => ({
+          id: t._id,
+          amount: t.amount,
+          status: t.status,
+          transactionDate: t.transactionDate
+        }))
+      });
+      
       res.json(result);
     } catch (error) {
-      console.error("Error fetching transactions:", error);
+      console.error("💰 Error fetching transactions:", error);
       res.status(500).json({ message: "Failed to fetch transactions" });
     }
   });

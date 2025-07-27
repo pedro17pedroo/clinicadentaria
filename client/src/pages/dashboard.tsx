@@ -1,4 +1,6 @@
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { DashboardMetrics } from "@/components/dashboard/metrics";
@@ -21,33 +23,96 @@ interface DashboardMetricsType {
 }
 
 export default function Dashboard() {
+  // Debug: verificar localStorage
+  React.useEffect(() => {
+    console.log('🔍 Dashboard: Verificando localStorage...');
+    const token = localStorage.getItem('auth_token');
+    const userData = localStorage.getItem('user_data');
+    console.log('🔑 Dashboard: Token no localStorage:', !!token);
+    console.log('👤 Dashboard: User data no localStorage:', !!userData);
+    if (token) {
+      console.log('🔑 Dashboard: Token (primeiros 20 chars):', token.substring(0, 20) + '...');
+    }
+    if (userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        console.log('👤 Dashboard: User data parsed:', parsedUser);
+      } catch (e) {
+        console.log('❌ Dashboard: Erro ao fazer parse do user data:', e);
+      }
+    }
+  }, []);
+
   // Buscar dados das APIs
   const { data: metrics, isLoading: metricsLoading } = useQuery<DashboardMetricsType>({
     queryKey: ["/api/dashboard/metrics"],
+    queryFn: async () => {
+      console.log('🔍 Dashboard: Fazendo requisição para /api/dashboard/metrics');
+      const response = await apiRequest("GET", "/api/dashboard/metrics");
+      const data = await response.json();
+      console.log('📊 Dashboard: Métricas recebidas:', data);
+      return data;
+    },
   });
 
-  const { data: transactions, isLoading: transactionsLoading } = useQuery({
-    queryKey: ["/api/transactions"],
+  // Query separada para todas as transações (para cálculo dos totais dos cards)
+  const { data: allTransactionsData, isLoading: transactionsLoading } = useQuery({
+    queryKey: ["/api/transactions", "all"],
+    queryFn: async () => {
+      console.log('🔍 Dashboard: Fazendo requisição para /api/transactions');
+      const response = await apiRequest("GET", "/api/transactions?limit=10000"); // Buscar todas as transações
+      const data = await response.json();
+      console.log('💰 Dashboard: Dados completos recebidos:', data);
+      console.log('💰 Dashboard: Estrutura:', {
+        isArray: Array.isArray(data),
+        hasTransactions: data?.transactions ? 'sim' : 'não',
+        transactionsLength: data?.transactions?.length || 0,
+        keys: data ? Object.keys(data) : 'null'
+      });
+      return data;
+    },
   });
+  
+  const transactions = allTransactionsData?.transactions || [];
 
   const { data: appointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: ["/api/appointments"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/appointments");
+      return response.json();
+    },
   });
 
   const { data: procedures, isLoading: proceduresLoading } = useQuery({
     queryKey: ["/api/procedures"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/procedures");
+      return response.json();
+    },
   });
 
   const { data: patients, isLoading: patientsLoading } = useQuery({
     queryKey: ["/api/patients"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/patients");
+      return response.json();
+    },
   });
 
   const { data: procedureTypes } = useQuery({
     queryKey: ["/api/procedure-types"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/procedure-types");
+      return response.json();
+    },
   });
 
   const { data: transactionTypes } = useQuery({
     queryKey: ["/api/transaction-types"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/transaction-types");
+      return response.json();
+    },
   });
 
   const isLoading = metricsLoading || transactionsLoading || appointmentsLoading || proceduresLoading || patientsLoading;
@@ -95,7 +160,12 @@ export default function Dashboard() {
 
   // Calcular métricas financeiras (igual à Gestão Financeira)
   const calculateFinancialMetrics = () => {
+    console.log('🧮 Dashboard: Calculando métricas financeiras');
+    console.log('🧮 Dashboard: Transações para cálculo:', transactions);
+    console.log('🧮 Dashboard: É array?', Array.isArray(transactions));
+    
     if (!transactions || !Array.isArray(transactions)) {
+      console.log('❌ Dashboard: Transações não disponíveis ou não é array');
       return {
         totalReceita: 0,
         totalDespesas: 0,
@@ -105,19 +175,30 @@ export default function Dashboard() {
         transacoesPendentes: 0
       };
     }
+    
+    console.log('📊 Dashboard: Número de transações encontradas:', transactions.length);
+    console.log('📊 Dashboard: Primeiras 3 transações:', transactions.slice(0, 3));
 
     const today = format(new Date(), 'yyyy-MM-dd');
     // Filtrar apenas transações com datas válidas
     const validTransactions = transactions.filter((t: any) => isValidDate(t.transactionDate));
+    console.log('📊 Dashboard: Transações válidas:', validTransactions.length);
     
     // Calcular totais gerais (TODAS as transações, não apenas pagas)
-    const totalReceita = validTransactions
-      .filter((t: any) => t.transactionTypeId?.category === 'income')
+    const incomeTransactions = validTransactions.filter((t: any) => t.transactionTypeId?.category === 'income');
+    const expenseTransactions = validTransactions.filter((t: any) => t.transactionTypeId?.category === 'expense');
+    
+    console.log('💰 Dashboard: Transações de receita:', incomeTransactions.length, incomeTransactions.map(t => ({ amount: t.amount, category: t.transactionTypeId?.category })));
+    console.log('💸 Dashboard: Transações de despesa:', expenseTransactions.length, expenseTransactions.map(t => ({ amount: t.amount, category: t.transactionTypeId?.category })));
+    
+    const totalReceita = incomeTransactions
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
     
-    const totalDespesas = validTransactions
-      .filter((t: any) => t.transactionTypeId?.category === 'expense')
+    const totalDespesas = expenseTransactions
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+    
+    console.log('💰 Dashboard: Total receita calculado:', totalReceita);
+    console.log('💸 Dashboard: Total despesas calculado:', totalDespesas);
     
     // Para receita e despesas de hoje, usar apenas transações pagas
     const paidTransactions = validTransactions.filter((t: any) => t.status === 'paid');
@@ -146,11 +227,11 @@ export default function Dashboard() {
       })
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
     
-    const transacoesPendentes = transactions
+    const transacoesPendentes = validTransactions
       .filter((t: any) => t.status === 'pending')
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
     
-    return {
+    const result = {
       totalReceita,
       totalDespesas,
       lucroLiquido: totalReceita - totalDespesas,
@@ -158,6 +239,9 @@ export default function Dashboard() {
       despesasHoje,
       transacoesPendentes
     };
+    
+    console.log('✅ Dashboard: Métricas calculadas:', result);
+    return result;
   };
 
   // Gerar dados para gráfico de procedimentos por tipo
@@ -261,7 +345,7 @@ export default function Dashboard() {
         )}
 
         {/* Métricas Financeiras Expandidas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -306,21 +390,6 @@ export default function Dashboard() {
                 </div>
                 <div className={`w-12 h-12 ${financialMetrics.lucroLiquido >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'} rounded-lg flex items-center justify-center`}>
                   <DollarSign className={`h-6 w-6 ${financialMetrics.lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Pagamentos Pendentes</p>
-                  <p className="text-2xl font-bold text-yellow-600">{financialMetrics.transacoesPendentes}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Requer atenção</p>
-                </div>
-                <div className="w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
-                  <AlertTriangle className="h-6 w-6 text-yellow-600" />
                 </div>
               </div>
             </CardContent>

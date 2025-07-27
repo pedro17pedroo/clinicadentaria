@@ -1301,6 +1301,8 @@ class MongoStorage implements IStorage {
     recentTransactions: ITransaction[];
   }> {
     try {
+      console.log('📊 [DASHBOARD METRICS] Iniciando cálculo das métricas...');
+      
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -1309,16 +1311,25 @@ class MongoStorage implements IStorage {
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
       endOfMonth.setHours(23, 59, 59, 999);
       
+      console.log('📊 [DASHBOARD METRICS] Datas calculadas:', {
+        today: today.toISOString(),
+        startOfMonth: startOfMonth.toISOString(),
+        endOfMonth: endOfMonth.toISOString()
+      });
+      
       // Consultas de hoje
       const todayEnd = new Date(today);
       todayEnd.setHours(23, 59, 59, 999);
       
+      console.log('📊 [DASHBOARD METRICS] Buscando consultas de hoje...');
       const todayAppointments = await Appointment.countDocuments({
         date: { $gte: today, $lte: todayEnd },
         status: { $ne: 'cancelled' }
       });
+      console.log('📊 [DASHBOARD METRICS] Consultas de hoje:', todayAppointments);
       
       // Pagamentos pendentes (valor total, não quantidade)
+      console.log('📊 [DASHBOARD METRICS] Buscando pagamentos pendentes...');
       const pendingPaymentsResult = await Transaction.aggregate([
         {
           $match: {
@@ -1334,8 +1345,13 @@ class MongoStorage implements IStorage {
       ]);
       
       const pendingPayments = pendingPaymentsResult[0]?.total || 0;
+      console.log('📊 [DASHBOARD METRICS] Pagamentos pendentes:', {
+        result: pendingPaymentsResult,
+        total: pendingPayments
+      });
       
       // Receita mensal
+      console.log('📊 [DASHBOARD METRICS] Buscando receita mensal...');
       const monthlyRevenueResult = await Transaction.aggregate([
         {
           $match: {
@@ -1365,8 +1381,13 @@ class MongoStorage implements IStorage {
       ]);
       
       const monthlyRevenue = monthlyRevenueResult[0]?.total || 0;
+      console.log('📊 [DASHBOARD METRICS] Receita mensal:', {
+        result: monthlyRevenueResult,
+        total: monthlyRevenue
+      });
       
       // Pacientes ativos (com consultas nos últimos 6 meses)
+      console.log('📊 [DASHBOARD METRICS] Buscando pacientes ativos...');
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       sixMonthsAgo.setHours(0, 0, 0, 0);
@@ -1377,8 +1398,14 @@ class MongoStorage implements IStorage {
       });
       
       const activePatients = activePatientIds.length;
+      console.log('📊 [DASHBOARD METRICS] Pacientes ativos:', {
+        sixMonthsAgo: sixMonthsAgo.toISOString(),
+        patientIds: activePatientIds.length,
+        total: activePatients
+      });
       
       // Consultas recentes
+      console.log('📊 [DASHBOARD METRICS] Buscando consultas recentes...');
       const recentAppointments = await Appointment.find({})
         .populate('patientId', 'name')
         .populate('doctorId', 'firstName lastName')
@@ -1386,16 +1413,19 @@ class MongoStorage implements IStorage {
         .sort({ createdAt: -1 })
         .limit(5)
         .exec();
+      console.log('📊 [DASHBOARD METRICS] Consultas recentes encontradas:', recentAppointments.length);
       
       // Transações recentes
+      console.log('📊 [DASHBOARD METRICS] Buscando transações recentes...');
       const recentTransactions = await Transaction.find({})
         .populate('patientId', 'name')
         .populate('transactionTypeId', 'name category')
         .sort({ transactionDate: -1 })
         .limit(5)
         .exec();
+      console.log('📊 [DASHBOARD METRICS] Transações recentes encontradas:', recentTransactions.length);
       
-      return {
+      const finalMetrics = {
         todayAppointments,
         pendingPayments,
         monthlyRevenue,
@@ -1403,8 +1433,19 @@ class MongoStorage implements IStorage {
         recentAppointments,
         recentTransactions
       };
+      
+      console.log('📊 [DASHBOARD METRICS] Métricas finais calculadas:', {
+        todayAppointments,
+        pendingPayments,
+        monthlyRevenue,
+        activePatients,
+        recentAppointmentsCount: recentAppointments.length,
+        recentTransactionsCount: recentTransactions.length
+      });
+      
+      return finalMetrics;
     } catch (error) {
-      console.error('Erro ao buscar métricas do dashboard:', error);
+      console.error('❌ [DASHBOARD METRICS] Erro ao buscar métricas do dashboard:', error);
       return {
         todayAppointments: 0,
         pendingPayments: 0,

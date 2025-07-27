@@ -13,6 +13,12 @@ export async function apiRequest(
   data?: unknown | undefined,
 ): Promise<Response> {
   const token = localStorage.getItem('auth_token');
+  console.log(`🌐 apiRequest: ${method} ${url}`);
+  console.log('🔑 apiRequest: Token presente?', !!token);
+  if (token) {
+    console.log('🔑 apiRequest: Token (primeiros 20 chars):', token.substring(0, 20) + '...');
+  }
+  
   const headers: Record<string, string> = {};
   
   if (data) {
@@ -23,6 +29,9 @@ export async function apiRequest(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  console.log('📤 apiRequest: Headers:', headers);
+  console.log('📤 apiRequest: Dados:', data);
+
   const res = await fetch(url, {
     method,
     headers,
@@ -30,6 +39,8 @@ export async function apiRequest(
     credentials: "include",
   });
 
+  console.log(`📥 apiRequest: Resposta ${res.status} para ${url}`);
+  
   await throwIfResNotOk(res);
   return res;
 }

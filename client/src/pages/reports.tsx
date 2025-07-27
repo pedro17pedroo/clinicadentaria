@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,9 +14,17 @@ export default function Reports() {
   const [dateRange, setDateRange] = useState("30");
   const [reportType, setReportType] = useState("revenue");
 
-  const { data: transactions } = useQuery({
-    queryKey: ["/api/transactions"],
+  // Query para todas as transações (para cálculos financeiros)
+  const { data: allTransactionsData } = useQuery({
+    queryKey: ["/api/transactions", "all"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/transactions?limit=10000"); // Buscar todas as transações
+      const data = await response.json();
+      return data;
+    },
   });
+  
+  const transactions = allTransactionsData?.transactions || [];
 
   const { data: appointments } = useQuery({
     queryKey: ["/api/appointments"],
