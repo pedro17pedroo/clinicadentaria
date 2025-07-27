@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Activity, Plus, Calendar, User, DollarSign, FileText, CheckCircle, CreditCard, Banknote, Smartphone } from "lucide-react";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
+import { Activity, Plus, Calendar, User, DollarSign, FileText, CheckCircle, CreditCard, Banknote, Smartphone, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search, Filter } from "lucide-react";
 import { ProcedureForm } from "@/components/forms/procedure-form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -22,14 +23,74 @@ export default function Procedures() {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedProcedure, setSelectedProcedure] = useState<any>(null);
   const [selectedPatient, setSelectedPatient] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [procedureTypeFilter, setProcedureTypeFilter] = useState<string>("all");
+  const [doctorFilter, setDoctorFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [amountPaid, setAmountPaid] = useState('');
   const [procedurePrice, setProcedurePrice] = useState(0);
   const { toast } = useToast();
+  const itemsPerPageOptions = [5, 10, 20, 50];
 
-  const { data: procedures = [], isLoading } = useQuery({
-    queryKey: ["/api/procedures", selectedPatient !== "all" ? { patientId: selectedPatient } : {}],
+  const { data: procedureData, isLoading } = useQuery({
+    queryKey: ["/api/procedures", selectedPatient, statusFilter, procedureTypeFilter, doctorFilter, searchTerm, currentPage, itemsPerPage],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: itemsPerPage.toString(),
+      });
+      
+      if (selectedPatient !== "all") {
+        params.append("patientId", selectedPatient);
+      }
+      if (statusFilter !== "all") {
+        params.append("status", statusFilter);
+      }
+      if (procedureTypeFilter !== "all") {
+        params.append("procedureTypeId", procedureTypeFilter);
+      }
+      if (doctorFilter !== "all") {
+        params.append("doctorId", doctorFilter);
+      }
+      if (searchTerm.trim()) {
+        params.append("search", searchTerm.trim());
+      }
+      
+      const url = `/api/procedures?${params.toString()}`;
+      const response = await apiRequest("GET", url);
+      return response.json();
+    },
   });
+  
+  // A API agora retorna um objeto com paginação
+  const procedures = procedureData?.procedures || [];
+  const totalPages = procedureData?.totalPages || 1;
+  const totalProcedures = procedureData?.total || 0;
+  
+  // Reset page when filters change
+  const handleFilterChange = (filterType: string, value: string) => {
+    setCurrentPage(1);
+    switch (filterType) {
+      case 'patient':
+        setSelectedPatient(value);
+        break;
+      case 'status':
+        setStatusFilter(value);
+        break;
+      case 'procedureType':
+        setProcedureTypeFilter(value);
+        break;
+      case 'doctor':
+        setDoctorFilter(value);
+        break;
+      case 'search':
+        setSearchTerm(value);
+        break;
+    }
+  };
 
   const { data: patients = [] } = useQuery({
     queryKey: ["/api/patients"],
@@ -132,11 +193,11 @@ export default function Procedures() {
       });
 
       // Buscar o tipo de transação "Pagamento de Procedimento"
-      const procedureTransactionType = transactionTypes?.find((tt: any) => 
+      const procedureTransactionType = Array.isArray(transactionTypes) ? transactionTypes.find((tt: any) => 
         tt.name === 'Pagamento de Procedimento' || 
         tt.name.toLowerCase().includes('procedimento') ||
         (tt.category === 'income' && tt.name.toLowerCase().includes('procedure'))
-      );
+      ) : null;
 
       if (!procedureTransactionType) {
         throw new Error('Tipo de transação não encontrado');
@@ -190,24 +251,117 @@ export default function Procedures() {
           subtitle="Acompanhe e gira os procedimentos realizados"
         />
 
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-4">
-            <Select value={selectedPatient} onValueChange={setSelectedPatient}>
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Filtrar por paciente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Pacientes</SelectItem>
-                {Array.isArray(patients) && patients.map((patient: any) => (
-                  patient.id ? (
-                    <SelectItem key={patient.id} value={patient.id.toString()}>
-                      {patient.name}
+        {/* Filtros e Controles */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filtros e Pesquisa</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4 mb-4">
+              {/* Pesquisa */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Pesquisar procedimentos..."
+                  value={searchTerm}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              
+              {/* Filtro por Paciente */}
+              <Select value={selectedPatient} onValueChange={(value) => handleFilterChange('patient', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por paciente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Pacientes</SelectItem>
+                  {Array.isArray(patients) && patients.map((patient: any) => (
+                    patient.id ? (
+                      <SelectItem key={patient.id} value={patient.id.toString()}>
+                        {patient.name}
+                      </SelectItem>
+                    ) : null
+                  )) || []}
+                </SelectContent>
+              </Select>
+              
+              {/* Filtro por Status */}
+              <Select value={statusFilter} onValueChange={(value) => handleFilterChange('status', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="pending">Em Curso</SelectItem>
+                  <SelectItem value="completed">Concluído</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Filtro por Tipo de Procedimento */}
+              <Select value={procedureTypeFilter} onValueChange={(value) => handleFilterChange('procedureType', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Tipo de procedimento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Tipos</SelectItem>
+                  {Array.isArray(procedureTypes) && procedureTypes.map((type: any) => (
+                    <SelectItem key={type._id || type.id} value={(type._id || type.id).toString()}>
+                      {type.name}
                     </SelectItem>
-                  ) : null
-                )) || []}
-              </SelectContent>
-            </Select>
-          </div>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {/* Filtro por Médico */}
+              <Select value={doctorFilter} onValueChange={(value) => handleFilterChange('doctor', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filtrar por médico" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Médicos</SelectItem>
+                  {Array.isArray(doctors) && doctors.map((doctor: any) => (
+                    <SelectItem key={doctor._id || doctor.id} value={(doctor._id || doctor.id).toString()}>
+                      Dr. {doctor.firstName} {doctor.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {/* Itens por página */}
+              <Select value={itemsPerPage.toString()} onValueChange={(value) => {
+                setItemsPerPage(Number(value));
+                setCurrentPage(1);
+              }}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {itemsPerPageOptions.map((option) => (
+                    <SelectItem key={option} value={option.toString()}>
+                      {option} por página
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {/* Informações de resultados */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                {totalProcedures > 0 && (
+                  <>Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, totalProcedures)} de {totalProcedures} procedimentos</>
+                )}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <div className="flex justify-between items-center mb-6">
+          <div />
           
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
@@ -444,6 +598,103 @@ export default function Procedures() {
             ))
           )}
         </div>
+        
+        {/* Paginação */}
+        {totalProcedures > 0 && (
+          <Card className="mt-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <p className="text-sm text-muted-foreground">
+                    Página {currentPage} de {totalPages}
+                  </p>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setCurrentPage(1)}
+                     disabled={currentPage === 1}
+                   >
+                     <ChevronsLeft className="h-4 w-4" />
+                   </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNumber;
+                      if (totalPages <= 5) {
+                        pageNumber = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNumber = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNumber = totalPages - 4 + i;
+                      } else {
+                        pageNumber = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNumber}
+                          variant={currentPage === pageNumber ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNumber)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNumber}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  
+                  <Button
+                     variant="outline"
+                     size="sm"
+                     onClick={() => setCurrentPage(totalPages)}
+                     disabled={currentPage === totalPages}
+                   >
+                     <ChevronsRight className="h-4 w-4" />
+                   </Button>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground">Ir para:</span>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={totalPages}
+                    value={currentPage}
+                    onChange={(e) => {
+                      const page = parseInt(e.target.value);
+                      if (page >= 1 && page <= totalPages) {
+                        setCurrentPage(page);
+                      }
+                    }}
+                    className="w-16 h-8"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </main>
 
       {/* Dialog de Edição */}
@@ -469,53 +720,7 @@ export default function Procedures() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de Detalhes */}
-      <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Detalhes do Procedimento</DialogTitle>
-            <DialogDescription>
-              Informações completas sobre o procedimento selecionado.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedProcedure && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Paciente</label>
-                  <p className="text-sm">{getPatientName(selectedProcedure.patientId)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Procedimento</label>
-                  <p className="text-sm">{getProcedureTypeName(selectedProcedure.procedureTypeId)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Médico</label>
-                  <p className="text-sm">{getDoctorName(selectedProcedure.doctorId)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Data</label>
-                  <p className="text-sm">{format(new Date(selectedProcedure.date), "dd/MM/yyyy")}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Custo</label>
-                  <p className="text-sm font-semibold">{selectedProcedure.cost?.toFixed(2)}€</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Status</label>
-                  <Badge variant="secondary">Concluído</Badge>
-                </div>
-              </div>
-              {selectedProcedure.notes && (
-                <div>
-                  <label className="text-sm font-medium text-gray-500">Observações</label>
-                  <p className="text-sm mt-1 p-3 bg-gray-50 rounded-md">{selectedProcedure.notes}</p>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+
 
       {/* Modal de Pagamento */}
       <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>

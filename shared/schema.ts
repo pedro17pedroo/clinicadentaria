@@ -110,11 +110,13 @@ export interface ITransaction extends Document {
   procedureId?: Types.ObjectId;
   transactionTypeId: Types.ObjectId;
   amount: number;
-  status: 'pending' | 'paid' | 'overdue';
+  status: 'pending' | 'paid' | 'overdue' | 'cancelled';
   description?: string;
   transactionDate: Date;
   dueDate?: Date;
   paidDate?: Date;
+  cancelledDate?: Date;
+  cancellationReason?: string;
   createdAt: Date;
 }
 
@@ -461,7 +463,7 @@ const transactionSchema = new Schema<ITransaction>({
   },
   status: {
     type: String,
-    enum: ['pending', 'paid', 'overdue'],
+    enum: ['pending', 'paid', 'overdue', 'cancelled'],
     default: 'pending'
   },
   description: String,
@@ -471,6 +473,11 @@ const transactionSchema = new Schema<ITransaction>({
   },
   dueDate: Date,
   paidDate: Date,
+  cancelledDate: Date,
+  cancellationReason: {
+    type: String,
+    trim: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -606,9 +613,10 @@ export const createTransactionSchema = z.object({
   transactionTypeId: z.string().min(1, 'Tipo de transação é obrigatório'),
   amount: z.number().min(0, 'Valor deve ser positivo'),
   description: z.string().optional(),
-  status: z.enum(['pending', 'paid', 'overdue']).optional(),
+  status: z.enum(['pending', 'paid', 'overdue', 'cancelled']).optional(),
   dueDate: z.string().optional(),
   paidDate: z.string().optional(),
+  cancelledDate: z.string().optional(),
   transactionDate: z.string().optional()
 });
 

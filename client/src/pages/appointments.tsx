@@ -17,6 +17,13 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
+interface AppointmentsResponse {
+  appointments: any[];
+  total: number;
+  totalPages: number;
+  currentPage: number;
+}
+
 export default function Appointments() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProcedureOpen, setIsProcedureOpen] = useState(false);
@@ -27,11 +34,32 @@ export default function Appointments() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [amountPaid, setAmountPaid] = useState('');
   const [consultationPrice, setConsultationPrice] = useState(0);
+  
+  // Estados para filtros e paginação
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [doctorFilter, setDoctorFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  
   const { toast } = useToast();
 
-  const { data: appointments, isLoading } = useQuery({
-    queryKey: ["/api/appointments", { date: selectedDate }],
+  const { data: appointmentsData, isLoading } = useQuery<AppointmentsResponse>({
+    queryKey: ["/api/appointments", { 
+      date: selectedDate,
+      search: searchTerm,
+      status: statusFilter,
+      doctorId: doctorFilter,
+      page: currentPage,
+      limit: itemsPerPage
+    }],
   });
+  
+  const appointments = appointmentsData?.appointments || [];
+  const totalPages = appointmentsData?.totalPages || 1;
+  const total = appointmentsData?.total || 0;
+
+
 
   const { data: patients } = useQuery({
     queryKey: ["/api/patients"],
@@ -336,7 +364,10 @@ export default function Appointments() {
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="px-3 py-2 border border-input rounded-md bg-background text-foreground"
               />
             </div>
@@ -361,11 +392,89 @@ export default function Appointments() {
           </Dialog>
         </div>
 
+        {/* Filtros */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <Label htmlFor="search">Pesquisar</Label>
+                <Input
+                  id="search"
+                  placeholder="Pesquisar por paciente, médico..."
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="status">Status</Label>
+                <Select value={statusFilter} onValueChange={(value) => {
+                  setStatusFilter(value);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos os status</SelectItem>
+                    <SelectItem value="scheduled">Agendado</SelectItem>
+                    <SelectItem value="completed">Concluído</SelectItem>
+                    <SelectItem value="cancelled">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="doctor">Médico</Label>
+                <Select value={doctorFilter} onValueChange={(value) => {
+                  setDoctorFilter(value);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Todos os médicos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos os médicos</SelectItem>
+                    {Array.isArray(doctors) && doctors.map((doctor: any) => (
+                      <SelectItem key={doctor._id || doctor.id} value={doctor._id || doctor.id}>
+                        {doctor.firstName ? `${doctor.firstName} ${doctor.lastName || ''}`.trim() : doctor.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-end">
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSearchTerm('');
+                    setStatusFilter('');
+                    setDoctorFilter('');
+                    setCurrentPage(1);
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5" />
-              <span>Consultas para {format(new Date(selectedDate), 'MMMM d, yyyy')}</span>
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Calendar className="h-5 w-5" />
+                <span>Consultas para {format(new Date(selectedDate), 'dd/MM/yyyy')}</span>
+              </div>
+              <div className="text-sm font-normal text-muted-foreground">
+                {total} {total === 1 ? 'consulta encontrada' : 'consultas encontradas'}
+                {(searchTerm || statusFilter || doctorFilter) && ' (filtrado)'}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -375,16 +484,16 @@ export default function Appointments() {
                   <div key={`loading-skeleton-${i}`} className="h-20 bg-muted animate-pulse rounded-lg" />
                 ))}
               </div>
-            ) : Array.isArray(appointments) && appointments.length === 0 ? (
+            ) : !appointments || appointments.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Nenhuma consulta agendada para esta data</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {(appointments as any[] || []).map((appointment: any) => (
+                {appointments.map((appointment: any) => (
                   <div
-                    key={appointment.id}
+                    key={appointment._id || appointment.id}
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border"
                   >
                     <div className="flex items-center space-x-4">
@@ -418,7 +527,7 @@ export default function Appointments() {
                         {appointment.status === "scheduled" && (
                           <>
                             <Button
-                              key={`complete-${appointment.id}`}
+                              key={`complete-${appointment._id || appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleCompleteAppointment(appointment)}
@@ -428,7 +537,7 @@ export default function Appointments() {
                               Concluir
                             </Button>
                             <Button
-                              key={`edit-${appointment.id}`}
+                              key={`edit-${appointment._id || appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleEditAppointment(appointment)}
@@ -438,7 +547,7 @@ export default function Appointments() {
                               Editar
                             </Button>
                             <Button
-                              key={`cancel-${appointment.id}`}
+                              key={`cancel-${appointment._id || appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleCancelAppointment(appointment)}
@@ -455,7 +564,7 @@ export default function Appointments() {
                         {appointment.status === "completed" && (
                           <>
                             <Button
-                              key={`notes-${appointment.id}`}
+                              key={`notes-${appointment._id || appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleViewMedicalNotes(appointment)}
@@ -464,7 +573,7 @@ export default function Appointments() {
                               Notas Médicas
                             </Button>
                             <Button
-                              key={`procedures-${appointment.id}`}
+                              key={`procedures-${appointment._id || appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleRecordProcedures(appointment)}
@@ -484,6 +593,61 @@ export default function Appointments() {
             )}
           </CardContent>
         </Card>
+
+        {/* Paginação */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6">
+            <div className="text-sm text-muted-foreground">
+              Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, total)} de {total} consultas
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                Anterior
+              </Button>
+              
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className="w-8 h-8 p-0"
+                    >
+                      {pageNum}
+                    </Button>
+                  );
+                })}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Próximo
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Procedure Recording Dialog */}
         <Dialog open={isProcedureOpen} onOpenChange={setIsProcedureOpen}>

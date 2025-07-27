@@ -584,15 +584,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Appointment routes - com controle de permissões
   app.get('/api/appointments', verifyToken, requirePermission('appointments.read'), async (req, res) => {
     try {
-      const { date, doctorId, patientId } = req.query;
+      const { date, doctorId, patientId, status, search, page, limit } = req.query;
       const filters: any = {};
       
       if (date && typeof date === 'string') filters.date = date;
       if (doctorId && typeof doctorId === 'string') filters.doctorId = doctorId;
       if (patientId && typeof patientId === 'string') filters.patientId = patientId;
+      if (status && typeof status === 'string') filters.status = status;
+      if (search && typeof search === 'string') filters.search = search;
+      if (page && typeof page === 'string') filters.page = parseInt(page, 10);
+      if (limit && typeof limit === 'string') filters.limit = parseInt(limit, 10);
       
-      const appointments = await storage.getAppointments(filters);
-      res.json(appointments);
+      const result = await storage.getAppointments(filters);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching appointments:", error);
       res.status(500).json({ message: "Failed to fetch appointments" });
@@ -674,15 +678,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Procedure routes
   app.get('/api/procedures', verifyToken, async (req, res) => {
     try {
-      const { patientId, doctorId, appointmentId } = req.query;
+      const { patientId, doctorId, appointmentId, procedureTypeId, status, search, page, limit } = req.query;
       const filters: any = {};
       
       if (patientId && typeof patientId === 'string') filters.patientId = patientId;
       if (doctorId && typeof doctorId === 'string') filters.doctorId = doctorId;
       if (appointmentId && typeof appointmentId === 'string') filters.appointmentId = appointmentId;
+      if (procedureTypeId && typeof procedureTypeId === 'string') filters.procedureTypeId = procedureTypeId;
+      if (status && typeof status === 'string') filters.status = status;
+      if (search && typeof search === 'string') filters.search = search;
+      if (page && typeof page === 'string') filters.page = parseInt(page, 10);
+      if (limit && typeof limit === 'string') filters.limit = parseInt(limit, 10);
       
-      const procedures = await storage.getProcedures(filters);
-      res.json(procedures);
+      const result = await storage.getProcedures(filters);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching procedures:", error);
       res.status(500).json({ message: "Failed to fetch procedures" });
@@ -720,25 +729,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const procedure = await storage.createProcedure(procedureData);
       
-      // Get procedure payment transaction type
-      const transactionTypes = await storage.getTransactionTypes();
-      const procedurePaymentType = transactionTypes.find(tt => 
-        tt.name.toLowerCase().includes('procedimento') || 
-        tt.name.toLowerCase().includes('procedure')
-      );
-      
-      // Create a transaction for the procedure only if transaction type exists
-      if (procedurePaymentType) {
-        await storage.createTransaction({
-          patientId: procedure.patientId.toString(),
-          procedureId: procedure.id.toString(),
-          transactionTypeId: (procedurePaymentType as any)._id.toString(),
-          amount: procedure.cost,
-          status: 'pending',
-          description: `Procedure: ${procedureType.name}`,
-          dueDate: new Date().toISOString().split('T')[0],
-        });
-      }
+      // Não criar transação automaticamente - será criada quando o pagamento for processado
       
       res.status(201).json(procedure);
     } catch (error) {
@@ -798,16 +789,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transaction routes - com controle de permissões
   app.get('/api/transactions', verifyToken, requirePermission('transactions.read'), async (req, res) => {
     try {
-      const { patientId, status, dateFrom, dateTo } = req.query;
+      const { patientId, status, dateFrom, dateTo, page, limit } = req.query;
       const filters: any = {};
       
       if (patientId && typeof patientId === 'string') filters.patientId = patientId;
       if (status && typeof status === 'string') filters.status = status;
       if (dateFrom && typeof dateFrom === 'string') filters.dateFrom = dateFrom;
       if (dateTo && typeof dateTo === 'string') filters.dateTo = dateTo;
+      if (page && typeof page === 'string') filters.page = parseInt(page, 10);
+      if (limit && typeof limit === 'string') filters.limit = parseInt(limit, 10);
       
-      const transactions = await storage.getTransactions(filters);
-      res.json(transactions);
+      const result = await storage.getTransactions(filters);
+      res.json(result);
     } catch (error) {
       console.error("Error fetching transactions:", error);
       res.status(500).json({ message: "Failed to fetch transactions" });
@@ -862,6 +855,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting transaction:", error);
       res.status(500).json({ message: "Failed to delete transaction" });
+    }
+  });
+
+  // Cancel paid transaction route
+  app.patch('/api/transactions/:id/cancel', verifyToken, requirePermission('transactions.write'), async (req, res) => {
+    try {
+      const id = req.params.id;
+      const { cancellationReason } = req.body;
+      
+      // Validate that cancellation reason is provided
+      if (!cancellationReason || typeof cancellationReason !== 'string' || cancellationReason.trim().length === 0) {
+        return res.status(400).json({ message: "Motivo do anulamento é obrigatório" });
+      }
+      
+      // Get the current transaction to verify it's paid
+      const currentTransaction = await storage.getTransaction(id);
+      if (!currentTransaction) {
+        return res.status(404).json({ message: "Transaction not found" });
+      }
+      
+      if (currentTransaction.status !== 'paid') {
+        return res.status(400).json({ message: "Only paid transactions can be cancelled" });
+      }
+      
+      // Update transaction to cancelled status
+      const updateData = {
+        status: 'cancelled' as any,
+        cancelledDate: new Date().toISOString(),
+        cancellationReason: cancellationReason.trim()
+      };
+      
+      const transaction = await storage.updateTransaction(id, updateData);
+      res.json(transaction);
+    } catch (error) {
+      console.error("Error cancelling transaction:", error);
+      res.status(500).json({ message: "Failed to cancel transaction" });
     }
   });
 
@@ -981,13 +1010,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: validatedData.password,
         isActive: validatedData.isActive ?? true,
         mustChangePassword: false,
-        workingDays: validatedData.userType === 'doctor' ? [] : undefined,
-        workingHours: validatedData.userType === 'doctor' ? { start: '08:00', end: '18:00' } : undefined,
-        consultationTypes: validatedData.userType === 'doctor' ? [] : undefined,
-        procedureTypes: validatedData.userType === 'doctor' ? [] : undefined,
-        dailySchedules: validatedData.userType === 'doctor' ? {} : undefined
+        ...(validatedData.userType === 'doctor' && {
+          workingDays: [],
+          workingHours: { start: '08:00', end: '18:00' },
+          consultationTypes: [],
+          procedureTypes: [],
+          dailySchedules: {}
+        })
       };
-      const user = await storage.createUser(userData);
+      const user = await storage.createUser(userData as any);
       res.status(201).json(user);
     } catch (error: any) {
       if (error instanceof z.ZodError) {

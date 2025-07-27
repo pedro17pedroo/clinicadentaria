@@ -85,7 +85,15 @@ export interface IStorage {
   deleteTransactionType(id: string): Promise<void>;
   
   // Operações de consulta
-  getAppointments(filters?: { date?: string; doctorId?: string; patientId?: string }): Promise<IAppointment[]>;
+  getAppointments(filters?: { 
+    date?: string; 
+    doctorId?: string; 
+    patientId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ appointments: IAppointment[]; total: number; totalPages: number; currentPage: number }>;
   getAppointment(id: string): Promise<IAppointment | null>;
   createAppointment(appointment: CreateAppointment): Promise<IAppointment>;
   updateAppointment(id: string, appointment: Partial<CreateAppointment>): Promise<IAppointment | null>;
@@ -93,13 +101,29 @@ export interface IStorage {
   getDoctorAvailability(doctorId: string, date: string): Promise<string[]>;
   
   // Operações de procedimento
-  getProcedures(filters?: { patientId?: string; doctorId?: string; appointmentId?: string }): Promise<IProcedure[]>;
+  getProcedures(filters?: { 
+    patientId?: string; 
+    doctorId?: string; 
+    appointmentId?: string;
+    procedureTypeId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ procedures: IProcedure[]; total: number; totalPages: number; currentPage: number }>;
   getProcedure(id: string): Promise<IProcedure | null>;
   createProcedure(procedure: CreateProcedure): Promise<IProcedure>;
   updateProcedure(id: string, procedure: Partial<CreateProcedure>): Promise<IProcedure | null>;
   
   // Operações de transação
-  getTransactions(filters?: { patientId?: string; status?: string; dateFrom?: string; dateTo?: string }): Promise<ITransaction[]>;
+  getTransactions(filters?: { 
+    patientId?: string; 
+    status?: string; 
+    dateFrom?: string; 
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ transactions: ITransaction[]; total: number; totalPages: number; currentPage: number }>;
   getTransaction(id: string): Promise<ITransaction | null>;
   createTransaction(transaction: CreateTransaction): Promise<ITransaction>;
   updateTransaction(id: string, transaction: Partial<CreateTransaction>): Promise<ITransaction | null>;
@@ -657,7 +681,15 @@ class MongoStorage implements IStorage {
   // OPERAÇÕES DE CONSULTA
   // ============================================================================
   
-  async getAppointments(filters?: { date?: string; doctorId?: string; patientId?: string }): Promise<IAppointment[]> {
+  async getAppointments(filters?: { 
+    date?: string; 
+    doctorId?: string; 
+    patientId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ appointments: IAppointment[]; total: number; totalPages: number; currentPage: number }> {
     try {
       const query: any = {};
       
@@ -670,16 +702,61 @@ class MongoStorage implements IStorage {
       if (filters?.patientId) {
         query.patientId = new Types.ObjectId(filters.patientId);
       }
+      if (filters?.status) {
+        query.status = filters.status;
+      }
       
-      return await Appointment.find(query)
+      // Configurações de paginação
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const skip = (page - 1) * limit;
+      
+      // Buscar total de registros
+      const total = await Appointment.countDocuments(query);
+      const totalPages = Math.ceil(total / limit);
+      
+      // Buscar consultas com paginação
+      let appointmentsQuery = Appointment.find(query)
         .populate('patientId', 'name di phone')
         .populate('doctorId', 'firstName lastName')
         .populate('consultationTypeId', 'name price')
         .sort({ date: -1, time: 1 })
-        .exec();
+        .skip(skip)
+        .limit(limit);
+      
+      const appointments = await appointmentsQuery.exec();
+      
+      // Aplicar filtro de pesquisa após popular os dados
+      let filteredAppointments = appointments;
+      if (filters?.search) {
+        const searchTerm = filters.search.toLowerCase();
+        filteredAppointments = appointments.filter((appointment: any) => {
+          const patientName = appointment.patientId?.name?.toLowerCase() || '';
+          const doctorName = `${appointment.doctorId?.firstName || ''} ${appointment.doctorId?.lastName || ''}`.toLowerCase();
+          const consultationTypeName = appointment.consultationTypeId?.name?.toLowerCase() || '';
+          const notes = appointment.notes?.toLowerCase() || '';
+          
+          return patientName.includes(searchTerm) ||
+                 doctorName.includes(searchTerm) ||
+                 consultationTypeName.includes(searchTerm) ||
+                 notes.includes(searchTerm);
+        });
+      }
+      
+      return {
+        appointments: filteredAppointments,
+        total,
+        totalPages,
+        currentPage: page
+      };
     } catch (error) {
       console.error('Erro ao buscar consultas:', error);
-      return [];
+      return {
+        appointments: [],
+        total: 0,
+        totalPages: 0,
+        currentPage: 1
+      };
     }
   }
   
@@ -839,7 +916,16 @@ class MongoStorage implements IStorage {
   // OPERAÇÕES DE PROCEDIMENTO
   // ============================================================================
   
-  async getProcedures(filters?: { patientId?: string; doctorId?: string; appointmentId?: string }): Promise<IProcedure[]> {
+  async getProcedures(filters?: { 
+    patientId?: string; 
+    doctorId?: string; 
+    appointmentId?: string;
+    procedureTypeId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ procedures: IProcedure[]; total: number; totalPages: number; currentPage: number }> {
     try {
       const query: any = {};
       
@@ -852,17 +938,65 @@ class MongoStorage implements IStorage {
       if (filters?.appointmentId) {
         query.appointmentId = new Types.ObjectId(filters.appointmentId);
       }
+      if (filters?.procedureTypeId) {
+        query.procedureTypeId = new Types.ObjectId(filters.procedureTypeId);
+      }
+      if (filters?.status) {
+        query.status = filters.status;
+      }
       
-      return await Procedure.find(query)
+      // Configurações de paginação
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const skip = (page - 1) * limit;
+      
+      // Buscar total de registros
+      const total = await Procedure.countDocuments(query);
+      const totalPages = Math.ceil(total / limit);
+      
+      // Buscar procedimentos com paginação
+      let proceduresQuery = Procedure.find(query)
         .populate('patientId', 'name di')
         .populate('doctorId', 'firstName lastName')
         .populate('procedureTypeId', 'name price category')
         .populate('appointmentId')
         .sort({ date: -1 })
-        .exec();
+        .skip(skip)
+        .limit(limit);
+      
+      const procedures = await proceduresQuery.exec();
+      
+      // Aplicar filtro de pesquisa após popular os dados
+      let filteredProcedures = procedures;
+      if (filters?.search) {
+        const searchTerm = filters.search.toLowerCase();
+        filteredProcedures = procedures.filter((procedure: any) => {
+          const patientName = procedure.patientId?.name?.toLowerCase() || '';
+          const doctorName = `${procedure.doctorId?.firstName || ''} ${procedure.doctorId?.lastName || ''}`.toLowerCase();
+          const procedureTypeName = procedure.procedureTypeId?.name?.toLowerCase() || '';
+          const notes = procedure.notes?.toLowerCase() || '';
+          
+          return patientName.includes(searchTerm) ||
+                 doctorName.includes(searchTerm) ||
+                 procedureTypeName.includes(searchTerm) ||
+                 notes.includes(searchTerm);
+        });
+      }
+      
+      return {
+        procedures: filteredProcedures,
+        total,
+        totalPages,
+        currentPage: page
+      };
     } catch (error) {
       console.error('Erro ao buscar procedimentos:', error);
-      return [];
+      return {
+        procedures: [],
+        total: 0,
+        totalPages: 0,
+        currentPage: 1
+      };
     }
   }
   
@@ -932,7 +1066,14 @@ class MongoStorage implements IStorage {
   // OPERAÇÕES DE TRANSAÇÃO
   // ============================================================================
   
-  async getTransactions(filters?: { patientId?: string; status?: string; dateFrom?: string; dateTo?: string }): Promise<ITransaction[]> {
+  async getTransactions(filters?: { 
+    patientId?: string; 
+    status?: string; 
+    dateFrom?: string; 
+    dateTo?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ transactions: ITransaction[]; total: number; totalPages: number; currentPage: number }> {
     try {
       const query: any = {};
       
@@ -952,16 +1093,40 @@ class MongoStorage implements IStorage {
         }
       }
       
-      return await Transaction.find(query)
+      // Configurações de paginação
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 10;
+      const skip = (page - 1) * limit;
+      
+      // Buscar total de registros
+      const total = await Transaction.countDocuments(query);
+      const totalPages = Math.ceil(total / limit);
+      
+      // Buscar transações com paginação
+      const transactions = await Transaction.find(query)
         .populate('patientId', 'name di')
         .populate('transactionTypeId', 'name category')
         .populate('appointmentId')
         .populate('procedureId')
         .sort({ transactionDate: -1 })
+        .skip(skip)
+        .limit(limit)
         .exec();
+        
+      return {
+        transactions,
+        total,
+        totalPages,
+        currentPage: page
+      };
     } catch (error) {
       console.error('Erro ao buscar transações:', error);
-      return [];
+      return {
+        transactions: [],
+        total: 0,
+        totalPages: 0,
+        currentPage: 1
+      };
     }
   }
   
