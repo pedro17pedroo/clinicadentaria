@@ -274,7 +274,7 @@ export default function Finances() {
         />
 
         {/* Financial Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
           {/* Total Líquido */}
           <Card>
             <CardContent className="p-4">
@@ -331,20 +331,7 @@ export default function Finances() {
             </CardContent>
           </Card>
 
-          {/* Pago */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-muted-foreground">Pago</p>
-                  <p className="text-xl font-bold text-green-600">{totals.paid.toFixed(2)} AOA</p>
-                </div>
-                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
 
           {/* Pendente */}
            <Card>
