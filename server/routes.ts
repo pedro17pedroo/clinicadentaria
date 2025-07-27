@@ -584,7 +584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Appointment routes - com controle de permissões
   app.get('/api/appointments', verifyToken, requirePermission('appointments.read'), async (req, res) => {
     try {
-      const { date, doctorId, patientId, status, search, page, limit } = req.query;
+      const { date, doctorId, patientId, status, search, page, limit, startDate, endDate } = req.query;
       const filters: any = {};
       
       if (date && typeof date === 'string') filters.date = date;
@@ -592,6 +592,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (patientId && typeof patientId === 'string') filters.patientId = patientId;
       if (status && typeof status === 'string') filters.status = status;
       if (search && typeof search === 'string') filters.search = search;
+      if (startDate && typeof startDate === 'string') filters.startDate = startDate;
+      if (endDate && typeof endDate === 'string') filters.endDate = endDate;
       if (page && typeof page === 'string') filters.page = parseInt(page, 10);
       if (limit && typeof limit === 'string') filters.limit = parseInt(limit, 10);
       

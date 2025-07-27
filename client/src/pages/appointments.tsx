@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, User, Plus, Edit, CheckCircle, Activity, X, FileText } from "lucide-react";
+import { Calendar, Clock, User, Plus, Edit, CheckCircle, Activity, X, FileText, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 import { AppointmentForm } from "@/components/forms/appointment-form";
 import { ProcedureForm } from "@/components/forms/procedure-form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -16,13 +16,6 @@ import { CreditCard, Banknote, Smartphone } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-
-interface AppointmentsResponse {
-  appointments: any[];
-  total: number;
-  totalPages: number;
-  currentPage: number;
-}
 
 export default function Appointments() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -36,30 +29,45 @@ export default function Appointments() {
   const [consultationPrice, setConsultationPrice] = useState(0);
   
   // Estados para filtros e paginação
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [doctorFilter, setDoctorFilter] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    doctorId: '',
+    startDate: '',
+    endDate: '',
+    page: 1,
+    limit: 10
+  });
+  const [showFilters, setShowFilters] = useState(false);
   
   const { toast } = useToast();
 
-  const { data: appointmentsData, isLoading } = useQuery<AppointmentsResponse>({
-    queryKey: ["/api/appointments", { 
-      date: selectedDate,
-      search: searchTerm,
-      status: statusFilter,
-      doctorId: doctorFilter,
-      page: currentPage,
-      limit: itemsPerPage
-    }],
+  const { data: appointmentsData, isLoading } = useQuery({
+    queryKey: ["/api/appointments", filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      
+      // Se selectedDate estiver definido e não houver filtros de data customizados
+      if (selectedDate && !filters.startDate && !filters.endDate) {
+        params.append('date', selectedDate);
+      }
+      
+      // Aplicar filtros
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && value !== '') {
+          params.append(key, value.toString());
+        }
+      });
+      
+      const response = await apiRequest("GET", `/api/appointments?${params.toString()}`);
+      return response as any;
+    },
   });
   
   const appointments = appointmentsData?.appointments || [];
   const totalPages = appointmentsData?.totalPages || 1;
+  const currentPage = appointmentsData?.currentPage || 1;
   const total = appointmentsData?.total || 0;
-
-
 
   const { data: patients } = useQuery({
     queryKey: ["/api/patients"],
@@ -218,6 +226,35 @@ export default function Appointments() {
     setIsProcedureOpen(true);
   };
 
+  // Funções para filtros e paginação
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value,
+      page: 1 // Reset para primeira página quando filtrar
+    }));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setFilters(prev => ({
+      ...prev,
+      page: newPage
+    }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: '',
+      doctorId: '',
+      startDate: '',
+      endDate: '',
+      page: 1,
+      limit: 10
+    });
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+  };
+
   const handleCancelAppointment = async (appointment: any) => {
     try {
       await updateAppointmentMutation.mutateAsync({
@@ -357,123 +394,139 @@ export default function Appointments() {
           subtitle="Gerencie a agenda de consultas da sua clínica"
         />
 
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-4">
+        {/* Barra de Filtros e Ações */}
+        <div className="mb-6 space-y-4">
+          {/* Linha superior com busca e botões */}
+          <div className="flex justify-between items-center">
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por paciente, médico, tipo..."
+                  value={filters.search}
+                  onChange={(e) => handleFilterChange('search', e.target.value)}
+                  className="pl-10 w-80"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowFilters(!showFilters)}
+                className="flex items-center space-x-2"
+              >
+                <Filter className="h-4 w-4" />
+                <span>Filtros</span>
+              </Button>
+              {(filters.search || filters.status || filters.doctorId || filters.startDate || filters.endDate) && (
+                <Button variant="ghost" onClick={clearFilters}>
+                  Limpar Filtros
+                </Button>
+              )}
+            </div>
+            
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nova Consulta
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Agendar Nova Consulta</DialogTitle>
+                  <DialogDescription>
+                    Preencha os dados abaixo para agendar uma nova consulta.
+                  </DialogDescription>
+                </DialogHeader>
+                <AppointmentForm onSuccess={() => setIsCreateOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Painel de filtros expansível */}
+          {showFilters && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <Label htmlFor="status-filter">Status</Label>
+                    <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos os status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos os status</SelectItem>
+                        <SelectItem value="scheduled">Agendado</SelectItem>
+                        <SelectItem value="completed">Concluído</SelectItem>
+                        <SelectItem value="cancelled">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="doctor-filter">Médico</Label>
+                    <Select value={filters.doctorId} onValueChange={(value) => handleFilterChange('doctorId', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Todos os médicos" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Todos os médicos</SelectItem>
+                        {Array.isArray(doctors) && doctors.map((doctor: any) => (
+                          <SelectItem key={doctor._id || doctor.id} value={doctor._id || doctor.id}>
+                            {doctor.firstName ? `${doctor.firstName} ${doctor.lastName || ''}`.trim() : doctor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="start-date">Data Inicial</Label>
+                    <Input
+                      id="start-date"
+                      type="date"
+                      value={filters.startDate}
+                      onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="end-date">Data Final</Label>
+                    <Input
+                      id="end-date"
+                      type="date"
+                      value={filters.endDate}
+                      onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Seletor de data rápida (quando não há filtros de data customizados) */}
+          {!filters.startDate && !filters.endDate && (
             <div className="flex items-center space-x-2">
               <Calendar className="h-5 w-5 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Data:</span>
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => {
-                  setSelectedDate(e.target.value);
-                  setCurrentPage(1);
-                }}
+                onChange={(e) => setSelectedDate(e.target.value)}
                 className="px-3 py-2 border border-input rounded-md bg-background text-foreground"
               />
             </div>
-          </div>
-          
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Consulta
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Agendar Nova Consulta</DialogTitle>
-                <DialogDescription>
-                  Preencha os dados abaixo para agendar uma nova consulta.
-                </DialogDescription>
-              </DialogHeader>
-              <AppointmentForm onSuccess={() => setIsCreateOpen(false)} />
-            </DialogContent>
-          </Dialog>
+          )}
         </div>
-
-        {/* Filtros */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="search">Pesquisar</Label>
-                <Input
-                  id="search"
-                  placeholder="Pesquisar por paciente, médico..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="status">Status</Label>
-                <Select value={statusFilter} onValueChange={(value) => {
-                  setStatusFilter(value);
-                  setCurrentPage(1);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todos os status</SelectItem>
-                    <SelectItem value="scheduled">Agendado</SelectItem>
-                    <SelectItem value="completed">Concluído</SelectItem>
-                    <SelectItem value="cancelled">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="doctor">Médico</Label>
-                <Select value={doctorFilter} onValueChange={(value) => {
-                  setDoctorFilter(value);
-                  setCurrentPage(1);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos os médicos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todos os médicos</SelectItem>
-                    {Array.isArray(doctors) && doctors.map((doctor: any) => (
-                      <SelectItem key={doctor._id || doctor.id} value={doctor._id || doctor.id}>
-                        {doctor.firstName ? `${doctor.firstName} ${doctor.lastName || ''}`.trim() : doctor.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="flex items-end">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setSearchTerm('');
-                    setStatusFilter('');
-                    setDoctorFilter('');
-                    setCurrentPage(1);
-                  }}
-                >
-                  Limpar Filtros
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Calendar className="h-5 w-5" />
-                <span>Consultas para {format(new Date(selectedDate), 'dd/MM/yyyy')}</span>
+                <span>Consultas ({total} encontradas)</span>
               </div>
-              <div className="text-sm font-normal text-muted-foreground">
-                {total} {total === 1 ? 'consulta encontrada' : 'consultas encontradas'}
-                {(searchTerm || statusFilter || doctorFilter) && ' (filtrado)'}
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <span>Página {currentPage} de {totalPages}</span>
               </div>
             </CardTitle>
           </CardHeader>
@@ -484,16 +537,21 @@ export default function Appointments() {
                   <div key={`loading-skeleton-${i}`} className="h-20 bg-muted animate-pulse rounded-lg" />
                 ))}
               </div>
-            ) : !appointments || appointments.length === 0 ? (
+            ) : Array.isArray(appointments) && appointments.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Nenhuma consulta agendada para esta data</p>
+                <p>Nenhuma consulta encontrada</p>
+                {(filters.search || filters.status || filters.doctorId || filters.startDate || filters.endDate) && (
+                  <Button variant="ghost" onClick={clearFilters} className="mt-4">
+                    Limpar filtros
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
-                {appointments.map((appointment: any) => (
+                {(appointments as any[] || []).map((appointment: any) => (
                   <div
-                    key={appointment._id || appointment.id}
+                    key={appointment.id}
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border"
                   >
                     <div className="flex items-center space-x-4">
@@ -527,7 +585,7 @@ export default function Appointments() {
                         {appointment.status === "scheduled" && (
                           <>
                             <Button
-                              key={`complete-${appointment._id || appointment.id}`}
+                              key={`complete-${appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleCompleteAppointment(appointment)}
@@ -537,7 +595,7 @@ export default function Appointments() {
                               Concluir
                             </Button>
                             <Button
-                              key={`edit-${appointment._id || appointment.id}`}
+                              key={`edit-${appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleEditAppointment(appointment)}
@@ -547,7 +605,7 @@ export default function Appointments() {
                               Editar
                             </Button>
                             <Button
-                              key={`cancel-${appointment._id || appointment.id}`}
+                              key={`cancel-${appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleCancelAppointment(appointment)}
@@ -564,7 +622,7 @@ export default function Appointments() {
                         {appointment.status === "completed" && (
                           <>
                             <Button
-                              key={`notes-${appointment._id || appointment.id}`}
+                              key={`notes-${appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleViewMedicalNotes(appointment)}
@@ -573,7 +631,7 @@ export default function Appointments() {
                               Notas Médicas
                             </Button>
                             <Button
-                              key={`procedures-${appointment._id || appointment.id}`}
+                              key={`procedures-${appointment.id}`}
                               size="sm"
                               variant="outline"
                               onClick={() => handleRecordProcedures(appointment)}
@@ -588,66 +646,66 @@ export default function Appointments() {
                       </div>
                     </div>
                   </div>
-                ))}
+                ))}              </div>            )}
+            
+            {/* Paginação */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 pt-6 border-t">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {((currentPage - 1) * filters.limit) + 1} a {Math.min(currentPage * filters.limit, total)} de {total} consultas
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Anterior
+                  </Button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                          className="w-8 h-8 p-0"
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Próxima
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
         </Card>
-
-        {/* Paginação */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between mt-6">
-            <div className="text-sm text-muted-foreground">
-              Mostrando {((currentPage - 1) * itemsPerPage) + 1} a {Math.min(currentPage * itemsPerPage, total)} de {total} consultas
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-              >
-                Anterior
-              </Button>
-              
-              <div className="flex items-center space-x-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-                  
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNum)}
-                      className="w-8 h-8 p-0"
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-              </div>
-              
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-              >
-                Próximo
-              </Button>
-            </div>
-          </div>
-        )}
 
         {/* Procedure Recording Dialog */}
         <Dialog open={isProcedureOpen} onOpenChange={setIsProcedureOpen}>

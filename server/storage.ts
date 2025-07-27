@@ -91,6 +91,8 @@ export interface IStorage {
     patientId?: string;
     status?: string;
     search?: string;
+    startDate?: string;
+    endDate?: string;
     page?: number;
     limit?: number;
   }): Promise<{ appointments: IAppointment[]; total: number; totalPages: number; currentPage: number }>;
@@ -687,61 +689,78 @@ class MongoStorage implements IStorage {
     patientId?: string;
     status?: string;
     search?: string;
+    startDate?: string;
+    endDate?: string;
     page?: number;
     limit?: number;
   }): Promise<{ appointments: IAppointment[]; total: number; totalPages: number; currentPage: number }> {
     try {
       const query: any = {};
       
+      // Filtros de data
       if (filters?.date) {
         query.date = new Date(filters.date);
+      } else if (filters?.startDate || filters?.endDate) {
+        query.date = {};
+        if (filters.startDate) {
+          query.date.$gte = new Date(filters.startDate);
+        }
+        if (filters.endDate) {
+          query.date.$lte = new Date(filters.endDate);
+        }
       }
+      
+      // Filtros por IDs
       if (filters?.doctorId) {
         query.doctorId = new Types.ObjectId(filters.doctorId);
       }
       if (filters?.patientId) {
         query.patientId = new Types.ObjectId(filters.patientId);
       }
+      
+      // Filtro por status
       if (filters?.status) {
         query.status = filters.status;
       }
       
-      // Configurações de paginação
+      // Configuração de paginação
       const page = filters?.page || 1;
       const limit = filters?.limit || 10;
       const skip = (page - 1) * limit;
       
-      // Buscar total de registros
-      const total = await Appointment.countDocuments(query);
-      const totalPages = Math.ceil(total / limit);
-      
-      // Buscar consultas com paginação
-      let appointmentsQuery = Appointment.find(query)
+      // Query base
+      let appointmentQuery = Appointment.find(query)
         .populate('patientId', 'name di phone')
         .populate('doctorId', 'firstName lastName')
         .populate('consultationTypeId', 'name price')
-        .sort({ date: -1, time: 1 })
+        .sort({ date: -1, time: 1 });
+      
+      // Aplicar paginação
+      const appointments = await appointmentQuery
         .skip(skip)
-        .limit(limit);
+        .limit(limit)
+        .exec();
       
-      const appointments = await appointmentsQuery.exec();
-      
-      // Aplicar filtro de pesquisa após popular os dados
+      // Filtro de pesquisa (aplicado após populate para buscar em campos relacionados)
       let filteredAppointments = appointments;
       if (filters?.search) {
         const searchTerm = filters.search.toLowerCase();
         filteredAppointments = appointments.filter((appointment: any) => {
           const patientName = appointment.patientId?.name?.toLowerCase() || '';
           const doctorName = `${appointment.doctorId?.firstName || ''} ${appointment.doctorId?.lastName || ''}`.toLowerCase();
-          const consultationTypeName = appointment.consultationTypeId?.name?.toLowerCase() || '';
-          const notes = appointment.notes?.toLowerCase() || '';
+          const consultationType = appointment.consultationTypeId?.name?.toLowerCase() || '';
+          const status = appointment.status?.toLowerCase() || '';
           
           return patientName.includes(searchTerm) ||
                  doctorName.includes(searchTerm) ||
-                 consultationTypeName.includes(searchTerm) ||
-                 notes.includes(searchTerm);
+                 consultationType.includes(searchTerm) ||
+                 status.includes(searchTerm);
         });
       }
+      
+      // Contar total de registros
+      const total = await Appointment.countDocuments(query);
+      const totalPages = Math.ceil(total / limit);
       
       return {
         appointments: filteredAppointments,
