@@ -97,7 +97,9 @@ export function AppointmentForm({ onSuccess, onCancel, appointment }: Appointmen
   const availableDoctors = React.useMemo(() => {
     if (!allDoctors || !Array.isArray(allDoctors) || !selectedConsultationType) return [];
     
-    const selectedType = consultationTypes?.find((ct: any) => ct._id === selectedConsultationType);
+    const selectedType = consultationTypes && Array.isArray(consultationTypes) 
+      ? consultationTypes.find((ct: any) => ct._id === selectedConsultationType)
+      : null;
     if (!selectedType) return [];
     
     return allDoctors
@@ -122,8 +124,8 @@ export function AppointmentForm({ onSuccess, onCancel, appointment }: Appointmen
       }));
   }, [allDoctors, selectedConsultationType, consultationTypes]);
 
-  // Buscar horários ocupados do médico na data selecionada
-  const { data: occupiedTimes } = useQuery({
+  // Buscar horários disponíveis do médico na data selecionada
+  const { data: availableTimesFromAPI } = useQuery({
     queryKey: ["/api/doctors", selectedDoctor, "availability", selectedDate],
     queryFn: async () => {
       if (!selectedDoctor || !selectedDate) return [];
@@ -133,52 +135,17 @@ export function AppointmentForm({ onSuccess, onCancel, appointment }: Appointmen
     enabled: !!(selectedDoctor && selectedDate),
   });
 
-  // Gerar horários disponíveis baseados no cronograma do médico
+  // Usar horários disponíveis retornados pela API
   const availableTimes = React.useMemo(() => {
-    if (!selectedDoctor || !selectedDate || !availableDoctors.length) return [];
+    if (!selectedDoctor || !selectedDate) return [];
     
-    const doctor = availableDoctors.find((d: any) => d.id === selectedDoctor);
-    if (!doctor) return [];
-    
-    const selectedDateObj = new Date(selectedDate);
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-    const dayName = dayNames[selectedDateObj.getDay()];
-    
-    // Verificar se o médico trabalha neste dia
-    if (doctor.workingDays.length > 0 && !doctor.workingDays.includes(dayName)) {
-      return [];
+    // Se a API retornou horários disponíveis, usar esses dados diretamente
+    if (availableTimesFromAPI && Array.isArray(availableTimesFromAPI)) {
+      return availableTimesFromAPI;
     }
     
-    // Obter horário de trabalho para o dia específico ou horário padrão
-    let workingHours = doctor.workingHours;
-    if (doctor.dailySchedules && doctor.dailySchedules[dayName] && doctor.dailySchedules[dayName].isActive) {
-      workingHours = {
-        start: doctor.dailySchedules[dayName].start,
-        end: doctor.dailySchedules[dayName].end
-      };
-    }
-    
-    // Gerar slots de 30 minutos
-    const times = [];
-    const startTime = new Date(`2000-01-01T${workingHours.start}:00`);
-    const endTime = new Date(`2000-01-01T${workingHours.end}:00`);
-    
-    let currentTime = new Date(startTime);
-    while (currentTime < endTime) {
-      const timeString = currentTime.toTimeString().substring(0, 5);
-      
-      // Verificar se este horário não está ocupado
-      const occupiedTimesArray = Array.isArray(occupiedTimes) ? occupiedTimes : [];
-      if (!occupiedTimesArray.includes(timeString)) {
-        times.push(timeString);
-      }
-      
-      // Adicionar 30 minutos
-      currentTime.setMinutes(currentTime.getMinutes() + 30);
-    }
-    
-    return times;
-  }, [selectedDoctor, selectedDate, availableDoctors, occupiedTimes]);
+    return [];
+  }, [selectedDoctor, selectedDate, availableTimesFromAPI]);
 
   const appointmentMutation = useMutation({
     mutationFn: async (data: AppointmentFormData) => {
@@ -449,7 +416,7 @@ export function AppointmentForm({ onSuccess, onCancel, appointment }: Appointmen
                       <SelectItem value="no-times" disabled>
                         {!selectedDoctor ? 'Selecione médico primeiro' : 
                          !selectedDate ? 'Selecione data primeiro' :
-                         occupiedTimes === undefined ? 'Carregando horários...' :
+                         availableTimesFromAPI === undefined ? 'Carregando horários...' :
                          availableTimes?.length === 0 ? 'Médico não trabalha neste dia ou todos os horários estão ocupados' :
                          'Nenhum horário disponível'}
                       </SelectItem>

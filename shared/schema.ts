@@ -200,6 +200,10 @@ const userSchema = new Schema<IUser>({
     type: String,
     trim: true
   }],
+  dailySchedules: {
+    type: Schema.Types.Mixed,
+    default: {}
+  },
   isActive: {
     type: Boolean,
     default: true
