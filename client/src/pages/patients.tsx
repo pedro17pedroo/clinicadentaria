@@ -26,11 +26,20 @@ export default function Patients() {
 
   const { data: patients, isLoading } = useQuery({
     queryKey: ["/api/patients", { search: searchQuery }],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+      const url = `/api/patients${params.toString() ? `?${params.toString()}` : ''}`;
+      const response = await apiRequest("GET", url);
+      return await response.json();
+    },
   });
 
   // Verificar se o utilizador tem permissão para eliminar pacientes
-  const canDeletePatients = user?.userType === 'admin' || 
-    (user?.permissions && user.permissions.includes('patients.delete'));
+  const canDeletePatients = (user as any)?.userType === 'admin' || 
+    ((user as any)?.permissions && (user as any).permissions.includes('patients.delete'));
 
   const deletePatientMutation = useMutation({
     mutationFn: async (patientId: string) => {
