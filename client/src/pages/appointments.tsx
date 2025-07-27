@@ -107,11 +107,11 @@ export default function Appointments() {
     // Buscar o preço do tipo de consulta
     const consultationType = typeof appointment.consultationTypeId === 'object' 
       ? appointment.consultationTypeId 
-      : consultationTypes?.find((ct: any) => 
+      : Array.isArray(consultationTypes) ? consultationTypes.find((ct: any) => 
           ct.id === appointment.consultationTypeId || 
           ct._id === appointment.consultationTypeId || 
           ct._id?.toString() === appointment.consultationTypeId?.toString()
-        );
+        ) : null;
     setConsultationPrice(consultationType?.price || 0);
     setAmountPaid('');
     setPaymentMethod('cash');
@@ -140,9 +140,9 @@ export default function Appointments() {
       console.log('Appointment updated successfully:', updatedAppointment);
 
       // Buscar o tipo de transação "Pagamento de Consulta"
-      const consultationTransactionType = transactionTypes?.find((tt: any) => 
+      const consultationTransactionType = Array.isArray(transactionTypes) ? transactionTypes.find((tt: any) => 
         tt.name === 'Pagamento de Consulta' || tt.category === 'income'
-      );
+      ) : null;
 
       if (!consultationTransactionType) {
         throw new Error('Tipo de transação não encontrado');
@@ -375,7 +375,7 @@ export default function Appointments() {
                   <div key={`loading-skeleton-${i}`} className="h-20 bg-muted animate-pulse rounded-lg" />
                 ))}
               </div>
-            ) : appointments?.length === 0 ? (
+            ) : Array.isArray(appointments) && appointments.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Nenhuma consulta agendada para esta data</p>
@@ -496,8 +496,16 @@ export default function Appointments() {
             </DialogHeader>
             {selectedAppointment && (
               <ProcedureForm 
-                appointmentId={selectedAppointment.id}
-                patientId={selectedAppointment.patientId}
+                appointmentId={selectedAppointment.id || selectedAppointment._id}
+                patientId={(() => {
+                  const patientId = selectedAppointment.patientId;
+                  // Se é um objeto populado, extrair o _id
+                  if (typeof patientId === 'object' && patientId !== null) {
+                    return patientId._id?.toString() || patientId.id?.toString() || '';
+                  }
+                  // Se é uma string, retornar diretamente
+                  return patientId?.toString() || '';
+                })()}
                 onSuccess={() => setIsProcedureOpen(false)}
               />
             )}

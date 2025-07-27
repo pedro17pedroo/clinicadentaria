@@ -7,11 +7,11 @@ import {
   createAppointmentSchema,
   createProcedureSchema,
   createTransactionSchema,
+  type IUser
 } from "@shared/schema";
 import { z } from "zod";
 import type { Request, Response, NextFunction, Express } from "express";
 import jwt from 'jsonwebtoken';
-import type { IUser } from "./models";
 
 // Schemas temporários para tipos não migrados
 const createConsultationTypeSchema = z.object({
@@ -49,7 +49,7 @@ const createUserTypeConfigSchema = z.object({
   description: z.string().optional(),
 });
 
-const createUserSchema = z.object({
+const createUserWithPasswordSchema = z.object({
   email: z.string().email('Email inválido'),
   firstName: z.string().min(1, 'Nome é obrigatório'),
   lastName: z.string().min(1, 'Sobrenome é obrigatório'),
@@ -693,6 +693,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = createProcedureSchema.parse(req.body);
       
+      // Validate ObjectIds
+      if (!mongoose.Types.ObjectId.isValid(validatedData.patientId)) {
+        return res.status(400).json({ message: "Invalid patient ID" });
+      }
+      if (!mongoose.Types.ObjectId.isValid(validatedData.doctorId)) {
+        return res.status(400).json({ message: "Invalid doctor ID" });
+      }
+      if (!mongoose.Types.ObjectId.isValid(validatedData.procedureTypeId)) {
+        return res.status(400).json({ message: "Invalid procedure type ID" });
+      }
+      if (validatedData.appointmentId && !mongoose.Types.ObjectId.isValid(validatedData.appointmentId)) {
+        return res.status(400).json({ message: "Invalid appointment ID" });
+      }
+      
       // Get procedure type for cost
       const procedureType = await storage.getProcedureType(validatedData.procedureTypeId);
       if (!procedureType) {
@@ -739,7 +753,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/procedures/:id', verifyToken, requirePermission('procedures.write'), async (req, res) => {
     try {
       const id = req.params.id;
+      
+      // Validate procedure ID
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid procedure ID" });
+      }
+      
       const validatedData = createProcedureSchema.partial().parse(req.body);
+      
+      // Validate ObjectIds if provided
+      if (validatedData.patientId && !mongoose.Types.ObjectId.isValid(validatedData.patientId)) {
+        return res.status(400).json({ message: "Invalid patient ID" });
+      }
+      if (validatedData.doctorId && !mongoose.Types.ObjectId.isValid(validatedData.doctorId)) {
+        return res.status(400).json({ message: "Invalid doctor ID" });
+      }
+      if (validatedData.procedureTypeId && !mongoose.Types.ObjectId.isValid(validatedData.procedureTypeId)) {
+        return res.status(400).json({ message: "Invalid procedure type ID" });
+      }
+      if (validatedData.appointmentId && !mongoose.Types.ObjectId.isValid(validatedData.appointmentId)) {
+        return res.status(400).json({ message: "Invalid appointment ID" });
+      }
       
       // If procedure type is being updated, get the new cost
       if (validatedData.procedureTypeId) {
@@ -936,18 +970,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/users', verifyToken, requireAdmin, async (req: any, res) => {
     try {
-      const validatedData = createUserSchema.parse(req.body);
-    const userData: Omit<IUser, '_id' | 'createdAt' | 'updatedAt'> = {
-      email: validatedData.email,
-      firstName: validatedData.firstName,
-      lastName: validatedData.lastName,
-      userType: validatedData.userType,
-      specialties: validatedData.specialties,
-      contactInfo: validatedData.contactInfo,
-      password: validatedData.password,
-      isActive: validatedData.isActive ?? true
-    };
-    const user = await storage.createUser(userData);
+      const validatedData = createUserWithPasswordSchema.parse(req.body);
+      const userData = {
+        email: validatedData.email,
+        firstName: validatedData.firstName,
+        lastName: validatedData.lastName,
+        userType: validatedData.userType,
+        specialties: validatedData.specialties || [],
+        contactInfo: validatedData.contactInfo,
+        password: validatedData.password,
+        isActive: validatedData.isActive ?? true,
+        mustChangePassword: false,
+        workingDays: validatedData.userType === 'doctor' ? [] : undefined,
+        workingHours: validatedData.userType === 'doctor' ? { start: '08:00', end: '18:00' } : undefined,
+        consultationTypes: validatedData.userType === 'doctor' ? [] : undefined,
+        procedureTypes: validatedData.userType === 'doctor' ? [] : undefined,
+        dailySchedules: validatedData.userType === 'doctor' ? {} : undefined
+      };
+      const user = await storage.createUser(userData);
       res.status(201).json(user);
     } catch (error: any) {
       if (error instanceof z.ZodError) {

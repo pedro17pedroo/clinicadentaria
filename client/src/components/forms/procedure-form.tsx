@@ -132,7 +132,7 @@ export function ProcedureForm({ onSuccess, appointmentId, patientId, initialData
       } else {
         // Criar novos procedimentos
         const promises = data.procedures.map(procedure => {
-          const procedureType = procedureTypes?.find?.((pt: any) => pt?.id?.toString?.() === procedure.procedureTypeId);
+          const procedureType = procedureTypes?.find?.((pt: any) => pt?._id?.toString?.() === procedure.procedureTypeId);
           return apiRequest("POST", "/api/procedures", {
             patientId: data.patientId,
             appointmentId: appointmentId,
