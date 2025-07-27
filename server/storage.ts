@@ -1313,10 +1313,22 @@ class MongoStorage implements IStorage {
         status: { $ne: 'cancelled' }
       });
       
-      // Pagamentos pendentes
-      const pendingPayments = await Transaction.countDocuments({
-        status: 'pending'
-      });
+      // Pagamentos pendentes (valor total, não quantidade)
+      const pendingPaymentsResult = await Transaction.aggregate([
+        {
+          $match: {
+            status: 'pending'
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$amount' }
+          }
+        }
+      ]);
+      
+      const pendingPayments = pendingPaymentsResult[0]?.total || 0;
       
       // Receita mensal
       const monthlyRevenueResult = await Transaction.aggregate([

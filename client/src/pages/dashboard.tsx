@@ -76,7 +76,7 @@ export default function Dashboard() {
         .filter((t: any) => {
           try {
             const transactionDate = format(new Date(t.transactionDate), 'yyyy-MM-dd');
-            return t.status === 'paid' && t.transactionType === 'income' && transactionDate === dateStr;
+            return t.status === 'paid' && t.transactionTypeId?.category === 'income' && transactionDate === dateStr;
           } catch (error) {
             console.warn('Erro ao formatar data da transação:', t.transactionDate);
             return false;
@@ -111,18 +111,18 @@ export default function Dashboard() {
     const paidTransactions = transactions.filter((t: any) => t.status === 'paid' && isValidDate(t.transactionDate));
     
     const totalReceita = paidTransactions
-      .filter((t: any) => t.transactionType === 'income')
+      .filter((t: any) => t.transactionTypeId?.category === 'income')
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
     
     const totalDespesas = paidTransactions
-      .filter((t: any) => t.transactionType === 'expense')
+      .filter((t: any) => t.transactionTypeId?.category === 'expense')
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
     
     const receitaHoje = paidTransactions
       .filter((t: any) => {
         try {
           const transactionDate = format(new Date(t.transactionDate), 'yyyy-MM-dd');
-          return t.transactionType === 'income' && transactionDate === today;
+          return t.transactionTypeId?.category === 'income' && transactionDate === today;
         } catch (error) {
           console.warn('Erro ao formatar data da transação:', t.transactionDate);
           return false;
@@ -134,7 +134,7 @@ export default function Dashboard() {
       .filter((t: any) => {
         try {
           const transactionDate = format(new Date(t.transactionDate), 'yyyy-MM-dd');
-          return t.transactionType === 'expense' && transactionDate === today;
+          return t.transactionTypeId?.category === 'expense' && transactionDate === today;
         } catch (error) {
           console.warn('Erro ao formatar data da transação:', t.transactionDate);
           return false;

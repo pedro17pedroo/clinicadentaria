@@ -53,7 +53,12 @@ export default function Reports() {
       const dateStr = format(date, 'yyyy-MM-dd');
       
       const dayRevenue = transactions
-        .filter((t: any) => t.status === 'paid' && format(new Date(t.transactionDate), 'yyyy-MM-dd') === dateStr)
+        .filter((t: any) => {
+          const isCorrectDate = format(new Date(t.transactionDate), 'yyyy-MM-dd') === dateStr;
+          const isPaid = t.status === 'paid';
+          const isIncome = t.transactionTypeId?.category === 'income';
+          return isPaid && isCorrectDate && isIncome;
+        })
         .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
       
       data.push({
@@ -211,7 +216,10 @@ export default function Reports() {
       const monthRevenue = transactions
         .filter((t: any) => {
           const tDate = new Date(t.transactionDate);
-          return t.status === 'paid' && tDate >= monthStart && tDate <= monthEnd;
+          const isPaid = t.status === 'paid';
+          const isInDateRange = tDate >= monthStart && tDate <= monthEnd;
+          const isIncome = t.transactionTypeId?.category === 'income';
+          return isPaid && isInDateRange && isIncome;
         })
         .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
       
