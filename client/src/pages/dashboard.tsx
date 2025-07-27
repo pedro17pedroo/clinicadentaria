@@ -93,7 +93,7 @@ export default function Dashboard() {
     return data;
   };
 
-  // Calcular métricas financeiras
+  // Calcular métricas financeiras (igual à Gestão Financeira)
   const calculateFinancialMetrics = () => {
     if (!transactions || !Array.isArray(transactions)) {
       return {
@@ -107,16 +107,20 @@ export default function Dashboard() {
     }
 
     const today = format(new Date(), 'yyyy-MM-dd');
-    // Filtrar apenas transações pagas e com datas válidas
-    const paidTransactions = transactions.filter((t: any) => t.status === 'paid' && isValidDate(t.transactionDate));
+    // Filtrar apenas transações com datas válidas
+    const validTransactions = transactions.filter((t: any) => isValidDate(t.transactionDate));
     
-    const totalReceita = paidTransactions
+    // Calcular totais gerais (TODAS as transações, não apenas pagas)
+    const totalReceita = validTransactions
       .filter((t: any) => t.transactionTypeId?.category === 'income')
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
     
-    const totalDespesas = paidTransactions
+    const totalDespesas = validTransactions
       .filter((t: any) => t.transactionTypeId?.category === 'expense')
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+    
+    // Para receita e despesas de hoje, usar apenas transações pagas
+    const paidTransactions = validTransactions.filter((t: any) => t.status === 'paid');
     
     const receitaHoje = paidTransactions
       .filter((t: any) => {
