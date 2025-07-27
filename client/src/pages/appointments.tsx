@@ -389,44 +389,24 @@ export default function Appointments() {
    };
 
   const getConsultationType = (consultationTypeId: any) => {
-    console.log('=== DEBUG getConsultationType ===');
-    console.log('consultationTypeId recebido:', consultationTypeId);
-    console.log('Tipo do consultationTypeId:', typeof consultationTypeId);
-    
     if (!consultationTypeId) {
-      console.log('consultationTypeId é null/undefined');
       return "Tipo Desconhecido";
     }
     
     // Se consultationTypeId já é um objeto populado (vem do populate do MongoDB)
     if (typeof consultationTypeId === 'object' && consultationTypeId.name) {
-      console.log('consultationTypeId é um objeto populado:', consultationTypeId);
       return consultationTypeId.name;
     }
     
     // Se consultationTypeId é um ID, buscar nos dados dos tipos de consulta
-    console.log('consultationTypes disponíveis:', consultationTypes);
-    console.log('consultationTypes é array?', Array.isArray(consultationTypes));
-    
     if (!Array.isArray(consultationTypes)) {
-      console.log('consultationTypes não é um array:', consultationTypes);
       return "Tipo Desconhecido";
     }
     
     const consultationType = consultationTypes.find((ct: any) => {
-      const match = ct.id === consultationTypeId || ct._id === consultationTypeId || ct._id?.toString() === consultationTypeId?.toString();
-      if (match) {
-        console.log('Tipo de consulta encontrado:', ct);
-      }
-      return match;
+      return ct.id === consultationTypeId || ct._id === consultationTypeId || ct._id?.toString() === consultationTypeId?.toString();
     });
     
-    if (!consultationType) {
-      console.log('Tipo de consulta não encontrado para ID:', consultationTypeId);
-      console.log('Tipos disponíveis:', consultationTypes);
-    }
-    
-    console.log('=== FIM DEBUG getConsultationType ===');
     return consultationType?.name || "Tipo Desconhecido";
   };
 
@@ -453,11 +433,6 @@ export default function Appointments() {
                   className="pl-10 w-80"
                 />
               </div>
-              {(filters.search || filters.status || filters.doctorId || filters.startDate || filters.endDate) && (
-                <Button variant="ghost" onClick={clearFilters}>
-                  Limpar Filtros
-                </Button>
-              )}
             </div>
             
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -519,11 +494,6 @@ export default function Appointments() {
               <div className="text-center py-12 text-muted-foreground">
                 <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Nenhuma consulta encontrada</p>
-                {(filters.search || filters.status || filters.doctorId || filters.startDate || filters.endDate) && (
-                  <Button variant="ghost" onClick={clearFilters} className="mt-4">
-                    Limpar filtros
-                  </Button>
-                )}
               </div>
             ) : (
               <div className="space-y-4">
