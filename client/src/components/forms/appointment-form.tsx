@@ -95,7 +95,7 @@ export function AppointmentForm({ onSuccess, onCancel, appointment }: Appointmen
 
   // Filtrar médicos por tipo de consulta selecionado
   const availableDoctors = React.useMemo(() => {
-    if (!allDoctors || !selectedConsultationType) return [];
+    if (!allDoctors || !Array.isArray(allDoctors) || !selectedConsultationType) return [];
     
     const selectedType = consultationTypes?.find((ct: any) => ct._id === selectedConsultationType);
     if (!selectedType) return [];
@@ -128,7 +128,7 @@ export function AppointmentForm({ onSuccess, onCancel, appointment }: Appointmen
     queryFn: async () => {
       if (!selectedDoctor || !selectedDate) return [];
       const response = await apiRequest("GET", `/api/doctors/${selectedDoctor}/availability?date=${selectedDate}`);
-      return response as string[];
+      return await response.json();
     },
     enabled: !!(selectedDoctor && selectedDate),
   });
@@ -137,7 +137,7 @@ export function AppointmentForm({ onSuccess, onCancel, appointment }: Appointmen
   const availableTimes = React.useMemo(() => {
     if (!selectedDoctor || !selectedDate || !availableDoctors.length) return [];
     
-    const doctor = availableDoctors.find(d => d.id === selectedDoctor);
+    const doctor = availableDoctors.find((d: any) => d.id === selectedDoctor);
     if (!doctor) return [];
     
     const selectedDateObj = new Date(selectedDate);
@@ -366,7 +366,7 @@ export function AppointmentForm({ onSuccess, onCancel, appointment }: Appointmen
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {availableDoctors.length > 0 ? availableDoctors.map((doctor) => (
+                  {availableDoctors.length > 0 ? availableDoctors.map((doctor: any) => (
                     <SelectItem key={doctor.id} value={doctor.id}>
                       <div className="flex flex-col">
                         <span>{doctor.name}</span>

@@ -5,7 +5,7 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, User, Plus, Edit, CheckCircle, Activity, X, FileText, Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
+import { Calendar, Clock, User, Plus, Edit, CheckCircle, Activity, X, FileText, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { AppointmentForm } from "@/components/forms/appointment-form";
 import { ProcedureForm } from "@/components/forms/procedure-form";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -38,9 +38,26 @@ export default function Appointments() {
     page: 1,
     limit: 10
   });
-  const [showFilters, setShowFilters] = useState(false);
+
   
   const { toast } = useToast();
+
+  // Invalidar queries quando a página é carregada para garantir dados atualizados
+  React.useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/consultation-types"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+  }, []);
+
+  // Função para abrir o modal Nova Consulta e garantir dados atualizados
+  const handleOpenCreateModal = () => {
+    // Invalidar queries antes de abrir o modal para garantir dados frescos
+    queryClient.invalidateQueries({ queryKey: ["/api/patients"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/consultation-types"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    setIsCreateOpen(true);
+  };
 
   const { data: appointmentsData, isLoading } = useQuery({
     queryKey: ["/api/appointments", filters, selectedDate],
@@ -372,20 +389,44 @@ export default function Appointments() {
    };
 
   const getConsultationType = (consultationTypeId: any) => {
-    if (!consultationTypeId) return "Tipo Desconhecido";
+    console.log('=== DEBUG getConsultationType ===');
+    console.log('consultationTypeId recebido:', consultationTypeId);
+    console.log('Tipo do consultationTypeId:', typeof consultationTypeId);
+    
+    if (!consultationTypeId) {
+      console.log('consultationTypeId é null/undefined');
+      return "Tipo Desconhecido";
+    }
     
     // Se consultationTypeId já é um objeto populado (vem do populate do MongoDB)
     if (typeof consultationTypeId === 'object' && consultationTypeId.name) {
+      console.log('consultationTypeId é um objeto populado:', consultationTypeId);
       return consultationTypeId.name;
     }
     
     // Se consultationTypeId é um ID, buscar nos dados dos tipos de consulta
-    if (!Array.isArray(consultationTypes)) return "Tipo Desconhecido";
+    console.log('consultationTypes disponíveis:', consultationTypes);
+    console.log('consultationTypes é array?', Array.isArray(consultationTypes));
+    
+    if (!Array.isArray(consultationTypes)) {
+      console.log('consultationTypes não é um array:', consultationTypes);
+      return "Tipo Desconhecido";
+    }
     
     const consultationType = consultationTypes.find((ct: any) => {
-      return ct.id === consultationTypeId || ct._id === consultationTypeId || ct._id?.toString() === consultationTypeId?.toString();
+      const match = ct.id === consultationTypeId || ct._id === consultationTypeId || ct._id?.toString() === consultationTypeId?.toString();
+      if (match) {
+        console.log('Tipo de consulta encontrado:', ct);
+      }
+      return match;
     });
     
+    if (!consultationType) {
+      console.log('Tipo de consulta não encontrado para ID:', consultationTypeId);
+      console.log('Tipos disponíveis:', consultationTypes);
+    }
+    
+    console.log('=== FIM DEBUG getConsultationType ===');
     return consultationType?.name || "Tipo Desconhecido";
   };
 
@@ -412,14 +453,6 @@ export default function Appointments() {
                   className="pl-10 w-80"
                 />
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center space-x-2"
-              >
-                <Filter className="h-4 w-4" />
-                <span>Filtros</span>
-              </Button>
               {(filters.search || filters.status || filters.doctorId || filters.startDate || filters.endDate) && (
                 <Button variant="ghost" onClick={clearFilters}>
                   Limpar Filtros
@@ -429,7 +462,7 @@ export default function Appointments() {
             
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button>
+                <Button onClick={handleOpenCreateModal}>
                   <Plus className="h-4 w-4 mr-2" />
                   Nova Consulta
                 </Button>
@@ -446,66 +479,7 @@ export default function Appointments() {
             </Dialog>
           </div>
 
-          {/* Painel de filtros expansível */}
-          {showFilters && (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <Label htmlFor="status-filter">Status</Label>
-                    <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos os status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Todos os status</SelectItem>
-                        <SelectItem value="scheduled">Agendado</SelectItem>
-                        <SelectItem value="completed">Concluído</SelectItem>
-                        <SelectItem value="cancelled">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="doctor-filter">Médico</Label>
-                    <Select value={filters.doctorId} onValueChange={(value) => handleFilterChange('doctorId', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Todos os médicos" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Todos os médicos</SelectItem>
-                        {Array.isArray(doctors) && doctors.map((doctor: any) => (
-                          <SelectItem key={doctor._id || doctor.id} value={doctor._id || doctor.id}>
-                            {doctor.firstName ? `${doctor.firstName} ${doctor.lastName || ''}`.trim() : doctor.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="start-date">Data Inicial</Label>
-                    <Input
-                      id="start-date"
-                      type="date"
-                      value={filters.startDate}
-                      onChange={(e) => handleFilterChange('startDate', e.target.value)}
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="end-date">Data Final</Label>
-                    <Input
-                      id="end-date"
-                      type="date"
-                      value={filters.endDate}
-                      onChange={(e) => handleFilterChange('endDate', e.target.value)}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+
 
           {/* Seletor de data rápida (quando não há filtros de data customizados) */}
           {!filters.startDate && !filters.endDate && (
@@ -555,7 +529,7 @@ export default function Appointments() {
               <div className="space-y-4">
                 {(appointments as any[] || []).map((appointment: any) => (
                   <div
-                    key={appointment.id}
+                    key={appointment._id || appointment.id}
                     className="flex items-center justify-between p-4 bg-muted/50 rounded-lg border"
                   >
                     <div className="flex items-center space-x-4">
