@@ -142,7 +142,9 @@ export default function Dashboard() {
       })
       .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
     
-    const transacoesPendentes = transactions.filter((t: any) => t.status === 'pending').length;
+    const transacoesPendentes = transactions
+      .filter((t: any) => t.status === 'pending')
+      .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
     
     return {
       totalReceita,
@@ -161,7 +163,13 @@ export default function Dashboard() {
     const typeCount: { [key: string]: number } = {};
     
     procedures.forEach((procedure: any) => {
-      const type = procedureTypes.find((pt: any) => pt.id === procedure.procedureTypeId);
+      // Verificar se procedureTypeId é um objeto populado ou apenas um ID
+      let procedureTypeId = procedure.procedureTypeId;
+      if (typeof procedureTypeId === 'object' && procedureTypeId !== null) {
+        procedureTypeId = procedureTypeId._id;
+      }
+      
+      const type = procedureTypes.find((pt: any) => pt._id === procedureTypeId || pt.id === procedureTypeId);
       if (type) {
         typeCount[type.name] = (typeCount[type.name] || 0) + 1;
       }
@@ -193,24 +201,24 @@ export default function Dashboard() {
     const weekAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd');
     
     // Filtrar apenas appointments com datas válidas
-    const validAppointments = appointments.filter((a: any) => isValidDate(a.appointmentDate));
+    const validAppointments = appointments.filter((a: any) => isValidDate(a.date));
     
     const hoje = validAppointments.filter((a: any) => {
       try {
-        const appointmentDate = format(new Date(a.appointmentDate), 'yyyy-MM-dd');
+        const appointmentDate = format(new Date(a.date), 'yyyy-MM-dd');
         return appointmentDate === today;
       } catch (error) {
-        console.warn('Erro ao formatar data do appointment:', a.appointmentDate);
+        console.warn('Erro ao formatar data do appointment:', a.date);
         return false;
       }
     }).length;
     
     const semana = validAppointments.filter((a: any) => {
       try {
-        const appointmentDate = format(new Date(a.appointmentDate), 'yyyy-MM-dd');
+        const appointmentDate = format(new Date(a.date), 'yyyy-MM-dd');
         return appointmentDate >= weekAgo && appointmentDate <= today;
       } catch (error) {
-        console.warn('Erro ao formatar data do appointment:', a.appointmentDate);
+        console.warn('Erro ao formatar data do appointment:', a.date);
         return false;
       }
     }).length;

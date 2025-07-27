@@ -1305,11 +1305,16 @@ class MongoStorage implements IStorage {
       today.setHours(0, 0, 0, 0);
       
       const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      startOfMonth.setHours(0, 0, 0, 0);
       const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
       
       // Consultas de hoje
+      const todayEnd = new Date(today);
+      todayEnd.setHours(23, 59, 59, 999);
+      
       const todayAppointments = await Appointment.countDocuments({
-        date: today,
+        date: { $gte: today, $lte: todayEnd },
         status: { $ne: 'cancelled' }
       });
       
@@ -1364,9 +1369,11 @@ class MongoStorage implements IStorage {
       // Pacientes ativos (com consultas nos últimos 6 meses)
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      sixMonthsAgo.setHours(0, 0, 0, 0);
       
       const activePatientIds = await Appointment.distinct('patientId', {
-        date: { $gte: sixMonthsAgo }
+        date: { $gte: sixMonthsAgo },
+        status: { $ne: 'cancelled' }
       });
       
       const activePatients = activePatientIds.length;
